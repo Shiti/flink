@@ -99,6 +99,8 @@ public class ExecutionVertex implements Serializable {
 
 	private volatile boolean scheduleLocalOnly;
 
+	private StateHandle operatorState;
+
 	// --------------------------------------------------------------------------------------------
 
 	public ExecutionVertex(
@@ -229,7 +231,7 @@ public class ExecutionVertex implements Serializable {
 	public InstanceConnectionInfo getCurrentAssignedResourceLocation() {
 		return currentExecution.getAssignedResourceLocation();
 	}
-	
+
 	public Execution getPriorExecutionAttempt(int attemptNumber) {
 		if (attemptNumber >= 0 && attemptNumber < priorExecutions.size()) {
 			return priorExecutions.get(attemptNumber);
@@ -238,7 +240,15 @@ public class ExecutionVertex implements Serializable {
 			throw new IllegalArgumentException("attempt does not exist");
 		}
 	}
-	
+
+	public void setOperatorState(StateHandle operatorState) {
+		this.operatorState = operatorState;
+	}
+
+	public StateHandle getOperatorState() {
+		return operatorState;
+	}
+
 	public ExecutionGraph getExecutionGraph() {
 		return this.jobVertex.getGraph();
 	}
@@ -447,6 +457,11 @@ public class ExecutionVertex implements Serializable {
 				if (grp != null) {
 					this.locationConstraint = grp.getLocationConstraint(subTaskIndex);
 				}
+
+				if (operatorState != null) {
+					execution.setOperatorState(operatorState);
+				}
+
 			}
 			else {
 				throw new IllegalStateException("Cannot reset a vertex that is in state " + state);
@@ -561,7 +576,7 @@ public class ExecutionVertex implements Serializable {
 	 * Returns all blocking result partitions whose receivers can be scheduled/updated.
 	 */
 	List<IntermediateResultPartition> finishAllBlockingPartitions() {
-		List<IntermediateResultPartition> finishedBlockingPartitions = null;
+		List<IntermediateResultPartition> finishedBlockingPartitions = new LinkedList<IntermediateResultPartition>();
 
 		for (IntermediateResultPartition partition : resultPartitions.values()) {
 			if (partition.getResultType().isBlocking() && partition.markFinished()) {
@@ -610,7 +625,7 @@ public class ExecutionVertex implements Serializable {
 
 	/**
 	 * Creates a task deployment descriptor to deploy a subtask to the given target slot.
-	 * 
+	 *
 	 * TODO: This should actually be in the EXECUTION
 	 */
 	TaskDeploymentDescriptor createDeploymentDescriptor(
@@ -657,6 +672,20 @@ public class ExecutionVertex implements Serializable {
 	// --------------------------------------------------------------------------------------------
 	//  Utilities
 	// --------------------------------------------------------------------------------------------
+
+	/**
+	 * Gets all IntermediateResultPartitions required by this Execution Vertex
+	 * @return list of intermediate result partitions
+	 */
+	public List<IntermediateResultPartition> getInputs() {
+		List<IntermediateResultPartition> intermediateResultPartitions = new ArrayList<IntermediateResultPartition>();
+		for (ExecutionEdge[] edgeList : inputEdges) {
+			for (ExecutionEdge edge : edgeList) {
+				intermediateResultPartitions.add(edge.getSource());
+			}
+		}
+		return intermediateResultPartitions;
+	}
 
 	/**
 	 * Creates a simple name representation in the style 'taskname (x/y)', where

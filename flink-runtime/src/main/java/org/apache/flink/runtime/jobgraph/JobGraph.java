@@ -86,7 +86,7 @@ public class JobGraph implements Serializable {
 	/** The number of seconds after which the corresponding ExecutionGraph is removed at the
 	 * job manager after it has been executed. */
 	private long sessionTimeout = 0;
-	
+
 	/** flag to enable queued scheduling */
 	private boolean allowQueuedScheduling;
 
@@ -227,12 +227,12 @@ public class JobGraph implements Serializable {
 	public long getExecutionRetryDelay() {
 		return executionRetryDelay;
 	}
-	
+
 	/**
 	 * Sets the delay that failed tasks are re-executed. A value of zero
 	 * effectively disables fault tolerance. A value of {@code -1} indicates that the system
 	 * default value (as defined in the configuration) should be used.
-	 * 
+	 *
 	 * @param executionRetryDelay The delay of time the system will wait to re-execute failed tasks.
 	 */
 	public void setExecutionRetryDelay(long executionRetryDelay){
@@ -260,7 +260,7 @@ public class JobGraph implements Serializable {
 	public void setSessionTimeout(long sessionTimeout) {
 		this.sessionTimeout = sessionTimeout;
 	}
-	
+
 	public void setAllowQueuedScheduling(boolean allowQueuedScheduling) {
 		this.allowQueuedScheduling = allowQueuedScheduling;
 	}
@@ -355,7 +355,7 @@ public class JobGraph implements Serializable {
 
 	/**
 	 * Sets the classpaths required to run the job on a task manager.
-	 * 
+	 *
 	 * @param paths paths of the directories/JAR files required to run the job on a task manager
 	 */
 	public void setClasspaths(List<URL> paths) {
@@ -384,7 +384,7 @@ public class JobGraph implements Serializable {
 			while (iter.hasNext()) {
 				JobVertex vertex = iter.next();
 				
-				if (vertex.hasNoConnectedInputs()) {
+				if (vertex.isInputVertex() || vertex.resumesFromIntermediateResult()) {
 					sorted.add(vertex);
 					iter.remove();
 				}
@@ -542,5 +542,15 @@ public class JobGraph implements Serializable {
 	@Override
 	public String toString() {
 		return "JobGraph(jobId: " + jobID + ")";
+	}
+
+	/**
+	 * Sets the default parallelism of all job vertices in this JobGraph.
+	 * @param parallelism
+	 */
+	public void setParallelism(int parallelism) {
+		for (AbstractJobVertex ejv : taskVertices.values()) {
+			ejv.setParallelism(parallelism);
+		}
 	}
 }

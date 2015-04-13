@@ -55,8 +55,9 @@ import org.apache.flink.runtime.io.disk.iomanager.IOManager.IOMode
 import org.apache.flink.runtime.io.disk.iomanager.{IOManager, IOManagerAsync}
 import org.apache.flink.runtime.io.network.NetworkEnvironment
 import org.apache.flink.runtime.io.network.netty.NettyConfig
+import org.apache.flink.runtime.io.network.partition.ResultPartitionManager
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID
-import org.apache.flink.runtime.memory.MemoryManager 
+import org.apache.flink.runtime.memory.MemoryManager
 import org.apache.flink.runtime.messages.Messages._
 import org.apache.flink.runtime.messages.RegistrationMessages._
 import org.apache.flink.runtime.messages.TaskManagerMessages._
@@ -166,7 +167,7 @@ class TaskManager(
   private var libraryCacheManager: Option[LibraryCacheManager] = None
   protected var currentJobManager: Option[ActorRef] = None
   private var jobManagerAkkaURL: Option[String] = None
- 
+
   private var instanceID: InstanceID = null
 
   private var heartbeatScheduler: Option[Cancellable] = None
@@ -363,10 +364,18 @@ class TaskManager(
             }
           }
 
-        // notifies the TaskManager that the state of a task has changed.
-        // the TaskManager informs the JobManager and cleans up in case the transition
-        // was into a terminal state, or in case the JobManager cannot be informed of the
-        // state transition
+      /**
+       * Pin a ResultPartition corresponding to an IntermediateResultPartition
+       */
+      case LockResultPartition(partitionID, numConsumers) =>
+        val partitionManager: ResultPartitionManager = this.network.getPartitionManager
+        val result: Boolean = partitionManager.pinCachedResultPartition(partitionID, numConsumers)
+        sender ! LockResultPartitionReply(result)
+
+      // notifies the TaskManager that the state of a task has changed.
+      // the TaskManager informs the JobManager and cleans up in case the transition
+      // was into a terminal state, or in case the JobManager cannot be informed of the
+      // state transition
 
       case updateMsg @ UpdateTaskExecutionState(taskExecutionState: TaskExecutionState) =>
 
@@ -743,6 +752,9 @@ class TaskManager(
     else {
       libraryCacheManager = Some(new FallbackLibraryCacheManager)
     }
+
+    currentJobManager = Some(jobManager)
+    instanceID = id
 
     // watch job manager to detect when it dies
     context.watch(jobManager)
@@ -1211,7 +1223,7 @@ object TaskManager {
     } else {
       LOG.info("Cannot determine the maximum number of open file descriptors")
     }
-    
+
     // try to parse the command line arguments
     val (configuration: Configuration,
          mode: StreamingMode) = try {
@@ -1430,8 +1442,8 @@ object TaskManager {
     LOG.info(s"Starting TaskManager in streaming mode $streamingMode")
 
     // Bring up the TaskManager actor system first, bind it to the given address.
-    
-    LOG.info("Starting TaskManager actor system at " + 
+
+    LOG.info("Starting TaskManager actor system at " +
       NetUtils.hostAndPortToUrlString(taskManagerHostname, actorSystemPort))
 
     val taskManagerSystem = try {
@@ -1551,7 +1563,7 @@ object TaskManager {
       taskManagerClass: Class[_ <: TaskManager])
     : ActorRef = {
 
-    val (taskManagerConfig : TaskManagerConfiguration,      
+    val (taskManagerConfig : TaskManagerConfiguration,
       netConfig: NetworkEnvironmentConfiguration,
       connectionInfo: InstanceConnectionInfo,
       memType: MemoryType
@@ -1628,17 +1640,17 @@ object TaskManager {
         preAllocateMemory)
     }
     catch {
-      case e: OutOfMemoryError => 
+      case e: OutOfMemoryError =>
         memType match {
           case MemoryType.HEAP =>
-            throw new Exception(s"OutOfMemory error (${e.getMessage()})" + 
+            throw new Exception(s"OutOfMemory error (${e.getMessage()})" +
               s" while allocating the TaskManager heap memory (${memorySize} bytes).", e)
-            
+
           case MemoryType.OFF_HEAP =>
             throw new Exception(s"OutOfMemory error (${e.getMessage()})" +
               s" while allocating the TaskManager off-heap memory (${memorySize} bytes). " +
               s"Try increasing the maximum direct memory (-XX:MaxDirectMemorySize)", e)
-            
+
           case _ => throw e
         }
     }
@@ -1776,15 +1788,15 @@ object TaskManager {
     checkConfigParameter(MathUtils.isPowerOf2(pageSize), pageSize,
       ConfigConstants.TASK_MANAGER_MEMORY_SEGMENT_SIZE_KEY,
       "Memory segment size must be a power of 2.")
-    
+
     // check whether we use heap or off-heap memory
-    val memType: MemoryType = 
+    val memType: MemoryType =
       if (configuration.getBoolean(ConfigConstants.TASK_MANAGER_MEMORY_OFF_HEAP_KEY, false)) {
         MemoryType.OFF_HEAP
       } else {
         MemoryType.HEAP
       }
-    
+
     // initialize the memory segment factory accordingly
     memType match {
       case MemoryType.HEAP =>
@@ -1998,8 +2010,8 @@ object TaskManager {
 
     // Pre-processing steps for registering cpuLoad
     val osBean: OperatingSystemMXBean = ManagementFactory.getOperatingSystemMXBean()
-        
-    val fetchCPULoadMethod: Option[Method] = 
+
+    val fetchCPULoadMethod: Option[Method] =
       try {
         Class.forName("com.sun.management.OperatingSystemMXBean")
           .getMethods()
@@ -2026,5 +2038,15 @@ object TaskManager {
       }
     })
     metricRegistry
+  }
+
+  /**
+   * Fetches getProcessCpuLoad method if available in the
+   *  OperatingSystemMXBean implementation else returns None
+   * @return
+   */
+  private def getMethodToFetchCPULoad(): Option[Method] = {
+    val methodsList = classOf[com.sun.management.OperatingSystemMXBean].getMethods()
+    methodsList.filter(_.getName == "getProcessCpuLoad").headOption
   }
 }

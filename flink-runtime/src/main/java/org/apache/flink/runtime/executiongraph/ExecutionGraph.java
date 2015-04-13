@@ -42,8 +42,11 @@ import org.apache.flink.runtime.jobgraph.JobStatus;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.ScheduleMode;
 import org.apache.flink.runtime.jobmanager.RecoveryMode;
+import org.apache.flink.runtime.jobmanager.StreamCheckpointCoordinator;
+import org.apache.flink.runtime.jobmanager.scheduler.NoResourceAvailableException;
 import org.apache.flink.runtime.jobmanager.scheduler.Scheduler;
 import org.apache.flink.runtime.messages.ExecutionGraphMessages;
+import org.apache.flink.runtime.state.StateHandle;
 import org.apache.flink.runtime.taskmanager.TaskExecutionState;
 import org.apache.flink.runtime.util.SerializableObject;
 import org.apache.flink.runtime.util.SerializedThrowable;
@@ -69,9 +72,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import static akka.dispatch.Futures.future;
@@ -97,7 +102,7 @@ import static akka.dispatch.Futures.future;
  *         about deployment of tasks and updates in the task status always use the ExecutionAttemptID to
  *         address the message receiver.</li>
  * </ul>
- * 
+ *
  * <p>The ExecutionGraph implements {@link java.io.Serializable}, because it can be archived by
  * sending it to an archive actor via an actor message. The execution graph does contain some
  * non-serializable fields. These fields are not required in the archived form and are cleared
@@ -112,7 +117,7 @@ public class ExecutionGraph implements Serializable {
 
 	/** The log object used for debugging. */
 	static final Logger LOG = LoggerFactory.getLogger(ExecutionGraph.class);
-	
+
 	// --------------------------------------------------------------------------------------------
 
 	/** The lock used to secure all access to mutable fields, especially the tracking of progress
@@ -150,10 +155,9 @@ public class ExecutionGraph implements Serializable {
 
 	/** Listeners that receive messages when the entire job switches it status (such as from
 	 * RUNNING to FINISHED) */
-	private final List<ActorGateway> jobStatusListenerActors;
+	private final Set<ActorRef> jobStatusListenerActors;
 
-	/** Listeners that receive messages whenever a single task execution changes its status */
-	private final List<ActorGateway> executionListenerActors;
+	private final Set<ActorRef> executionListenerActors;
 
 	/** Timestamps (in milliseconds as returned by {@code System.currentTimeMillis()} when
 	 * the execution graph transitioned into a certain state. The index into this array is the
@@ -179,15 +183,16 @@ public class ExecutionGraph implements Serializable {
 
 	/** The mode of scheduling. Decides how to select the initial set of tasks to be deployed.
 	 * May indicate to deploy all sources, or to deploy everything, or to deploy via backtracking
-	 * from results than need to be materialized. */
+	 * from results that need to be materialized. */
 	private ScheduleMode scheduleMode = ScheduleMode.FROM_SOURCES;
 
 	/** Flag that indicate whether the executed dataflow should be periodically snapshotted */
 	private boolean snapshotCheckpointsEnabled;
 
+
 	/** Flag to indicate whether the Graph has been archived */
 	private boolean isArchived = false;
-		
+
 
 	// ------ Execution status and progress. These values are volatile, and accessed under the lock -------
 
@@ -219,6 +224,13 @@ public class ExecutionGraph implements Serializable {
 	/** The execution context which is used to execute futures. */
 	@SuppressWarnings("NonSerializableFieldInSerializableClass")
 	private ExecutionContext executionContext;
+
+
+	/** The position of the vertex that is next expected to finish.
+	 * This is an index into the "verticesInCreationOrder" collection.
+	 * Once this value has reached the number of vertices, the job is done. */
+	private int nextVertexToFinish;
+
 
 	// ------ Fields that are only relevant for archived execution graphs ------------
 	private ExecutionConfig executionConfig;
@@ -276,8 +288,8 @@ public class ExecutionGraph implements Serializable {
 		this.verticesInCreationOrder = new ArrayList<ExecutionJobVertex>();
 		this.currentExecutions = new ConcurrentHashMap<ExecutionAttemptID, Execution>();
 
-		this.jobStatusListenerActors  = new CopyOnWriteArrayList<ActorGateway>();
-		this.executionListenerActors = new CopyOnWriteArrayList<ActorGateway>();
+		this.jobStatusListenerActors  = new CopyOnWriteArraySet<ActorRef>();
+		this.executionListenerActors = new CopyOnWriteArraySet<ActorRef>();
 
 		this.stateTimestamps = new long[JobStatus.values().length];
 		this.stateTimestamps[JobStatus.CREATED.ordinal()] = System.currentTimeMillis();
@@ -288,8 +300,21 @@ public class ExecutionGraph implements Serializable {
 		this.timeout = timeout;
 	}
 
+
+	public void setStateCheckpointerActor(ActorRef stateCheckpointerActor) {
+		this.stateCheckpointerActor = stateCheckpointerActor;
+	}
+
+	public ActorRef getStateCheckpointerActor() {
+		return stateCheckpointerActor;
+	}
+
+	public void setParentContext(ActorContext parentContext) {
+		this.parentContext = parentContext;
+	}
+
 	// --------------------------------------------------------------------------------------------
-	//  Configuration of Data-flow wide execution settings  
+	//  Configuration of Data-flow wide execution settings
 	// --------------------------------------------------------------------------------------------
 
 	/**
@@ -299,7 +324,7 @@ public class ExecutionGraph implements Serializable {
 	public int getNumberOfExecutionJobVertices() {
 		return this.verticesInCreationOrder.size();
 	}
-	
+
 	public void setNumberOfRetriesLeft(int numberOfRetriesLeft) {
 		if (numberOfRetriesLeft < -1) {
 			throw new IllegalArgumentException();
@@ -364,11 +389,11 @@ public class ExecutionGraph implements Serializable {
 		ExecutionVertex[] tasksToTrigger = collectExecutionVertices(verticesToTrigger);
 		ExecutionVertex[] tasksToWaitFor = collectExecutionVertices(verticesToWaitFor);
 		ExecutionVertex[] tasksToCommitTo = collectExecutionVertices(verticesToCommitTo);
-		
+
 		// disable to make sure existing checkpoint coordinators are cleared
 		disableSnaphotCheckpointing();
-		
-		// create the coordinator that triggers and commits checkpoints and holds the state 
+
+		// create the coordinator that triggers and commits checkpoints and holds the state
 		snapshotCheckpointsEnabled = true;
 		checkpointCoordinator = new CheckpointCoordinator(
 				jobID,
@@ -400,7 +425,7 @@ public class ExecutionGraph implements Serializable {
 		if (state != JobStatus.CREATED) {
 			throw new IllegalStateException("Job must be in CREATED state");
 		}
-		
+
 		snapshotCheckpointsEnabled = false;
 		if (checkpointCoordinator != null) {
 			checkpointCoordinator.shutdown();
@@ -414,6 +439,14 @@ public class ExecutionGraph implements Serializable {
 
 	public CheckpointCoordinator getCheckpointCoordinator() {
 		return checkpointCoordinator;
+	}
+
+	public void setCheckpointingEnabled(boolean checkpointingEnabled) {
+		this.checkpointingEnabled = checkpointingEnabled;
+	}
+
+	public void setCheckpointingInterval(long checkpointingInterval) {
+		this.checkpointingInterval = checkpointingInterval;
 	}
 
 	private ExecutionVertex[] collectExecutionVertices(List<ExecutionJobVertex> jobVertices) {
@@ -657,16 +690,16 @@ public class ExecutionGraph implements Serializable {
 			this.verticesInCreationOrder.add(ejv);
 		}
 	}
-	
-	public void scheduleForExecution(Scheduler scheduler) throws JobException {
+
+	public void scheduleForExecution(final Scheduler scheduler) throws JobException {
 		if (scheduler == null) {
 			throw new IllegalArgumentException("Scheduler must not be null.");
 		}
-		
+
 		if (this.scheduler != null && this.scheduler != scheduler) {
 			throw new IllegalArgumentException("Cannot use different schedulers for the same job");
 		}
-		
+
 		if (transitionState(JobStatus.CREATED, JobStatus.RUNNING)) {
 			this.scheduler = scheduler;
 
@@ -690,9 +723,38 @@ public class ExecutionGraph implements Serializable {
 				case BACKTRACKING:
 					// go back from vertices that need computation to the ones we need to run
 					throw new JobException("BACKTRACKING is currently not supported as schedule mode.");
+					/**
+					 *  Start from the sinks that do not produce intermediate results and track
+					 *	 back to find available intermediate results.
+					 */
+
+					Backtracking backtracking = new Backtracking(this.tasks.values());
+
+					backtracking.setScheduleAction(new Backtracking.ScheduleAction() {
+						@Override
+						public void schedule(ExecutionVertex ev) {
+							try {
+								ev.scheduleForExecution(scheduler, allowQueuedScheduling);
+							} catch (NoResourceAvailableException e) {
+								e.printStackTrace();
+								fail(e);
+							}
+						}
+					});
+
+					backtracking.scheduleUsingBacktracking();
+
+					break;
+
 				default:
-					throw new JobException("Schedule mode is invalid.");
+					throw new JobException("Unsupported scheduling mode.");
 			}
+
+			if (checkpointingEnabled) {
+				stateCheckpointerActor = StreamCheckpointCoordinator.spawn(parentContext, this,
+						Duration.create(checkpointingInterval, TimeUnit.MILLISECONDS));
+			}
+
 		}
 		else {
 			throw new IllegalStateException("Job may only be scheduled from state " + JobStatus.CREATED);
@@ -866,76 +928,68 @@ public class ExecutionGraph implements Serializable {
 		}
 	}
 
-	void jobVertexInFinalState() {
+	void jobVertexInFinalState(ExecutionJobVertex ev) {
 		synchronized (progressLock) {
-			if (numFinishedJobVertices >= verticesInCreationOrder.size()) {
-				throw new IllegalStateException("All vertices are already finished, cannot transition vertex to finished.");
+			int nextPos = nextVertexToFinish;
+			if (nextPos >= verticesInCreationOrder.size()) {
+				// already done, and we still get a report?
+				// this can happen when:
+				// - two job vertices finish almost simultaneously
+				// - The first one advances the position for the second as well (second is in final state)
+				// - the second (after it could grab the lock) tries to advance the position again
+				return;
 			}
 
-			numFinishedJobVertices++;
-			
-			if (numFinishedJobVertices == verticesInCreationOrder.size()) {
-				
-				// we are done, transition to the final state
-				JobStatus current;
-				while (true) {
-					current = this.state;
-					
-					if (current == JobStatus.RUNNING) {
-						if (transitionState(current, JobStatus.FINISHED)) {
-							postRunCleanup();
+			// see if we are the next to finish and then progress until the next unfinished one
+			if (verticesInCreationOrder.get(nextPos) == ev) {
+				do {
+					nextPos++;
+				}
+				while (nextPos < verticesInCreationOrder.size() && verticesInCreationOrder.get(nextPos).isInFinalState());
+
+				nextVertexToFinish = nextPos;
+
+				if (nextPos == verticesInCreationOrder.size()) {
+
+					// we are done, transition to the final state
+
+					while (true) {
+						JobStatus current = this.state;
+						if (current == JobStatus.RUNNING && transitionState(current, JobStatus.FINISHED)) {
 							break;
 						}
-					}
-					else if (current == JobStatus.CANCELLING) {
-						if (transitionState(current, JobStatus.CANCELED)) {
-							postRunCleanup();
+						if (current == JobStatus.CANCELLING && transitionState(current, JobStatus.CANCELED)) {
 							break;
 						}
-					}
-					else if (current == JobStatus.FAILING) {
-						if (numberOfRetriesLeft > 0 && transitionState(current, JobStatus.RESTARTING)) {
-							numberOfRetriesLeft--;
-							
-							if (delayBeforeRetrying > 0) {
+						if (current == JobStatus.FAILING) {
+							if (numberOfRetriesLeft > 0 && transitionState(current, JobStatus.RESTARTING)) {
+								numberOfRetriesLeft--;
 								future(new Callable<Object>() {
 									@Override
 									public Object call() throws Exception {
-										try {
-											LOG.info("Delaying retry of job execution for {} ms ...", delayBeforeRetrying);
+										try{
 											Thread.sleep(delayBeforeRetrying);
-										}
-										catch(InterruptedException e){
+										}catch(InterruptedException e){
 											// should only happen on shutdown
 										}
 										restart();
 										return null;
 									}
-								}, executionContext);
-							} else {
-								future(new Callable<Object>() {
-									@Override
-									public Object call() throws Exception {
-										restart();
-										return null;
-									}
-								}, executionContext);
+								}, AkkaUtils.globalExecutionContext());
+								break;
 							}
-							break;
+							else if (numberOfRetriesLeft <= 0 && transitionState(current, JobStatus.FAILED, failureCause)) {
+								break;
+							}
 						}
-						else if (numberOfRetriesLeft <= 0 && transitionState(current, JobStatus.FAILED, failureCause)) {
-							postRunCleanup();
-							break;
+						if (current == JobStatus.CANCELED || current == JobStatus.CREATED || current == JobStatus.FINISHED) {
+							fail(new Exception("ExecutionGraph went into final state from state " + current));
 						}
 					}
-					else {
-						fail(new Exception("ExecutionGraph went into final state from state " + current));
-					}
-				}
-				// done transitioning the state
 
-				// also, notify waiters
-				progressLock.notifyAll();
+					// also, notify waiters
+					progressLock.notifyAll();
+				}
 			}
 		}
 	}
@@ -959,8 +1013,8 @@ public class ExecutionGraph implements Serializable {
 
 	/**
 	 * Updates the state of one of the ExecutionVertex's Execution attempts.
-	 * If the new status if "FINISHED", this also updates the 
-	 * 
+	 * If the new status if "FINISHED", this also updates the
+	 *
 	 * @param state The state update.
 	 * @return True, if the task update was properly applied, false, if the execution attempt was not found.
 	 */
@@ -1000,6 +1054,13 @@ public class ExecutionGraph implements Serializable {
 		}
 		else {
 			return false;
+		}
+	}
+
+	public void loadOperatorStates(Map<Tuple3<JobVertexID, Integer, Long> , StateHandle> states) {
+		synchronized (this.progressLock) {
+			for (Map.Entry<Tuple3<JobVertexID, Integer, Long>, StateHandle> state : states.entrySet())
+				tasks.get(state.getKey()._1()).getTaskVertices()[state.getKey()._2()].setOperatorState(state.getValue());
 		}
 	}
 
