@@ -108,6 +108,9 @@ public class ResultPartition implements BufferPoolOwner {
 
 	private boolean hasNotifiedPipelinedConsumers;
 
+	/**
+	 * ResultPartition has been completely produced.
+	 */
 	private boolean isFinished;
 
 	private volatile Throwable cause;
@@ -212,6 +215,11 @@ public class ResultPartition implements BufferPoolOwner {
 	public long getTotalNumberOfBytes() {
 		return totalNumberOfBytes;
 	}
+
+	public boolean isFinished() {
+		return isFinished;
+	}
+
 
 	// ------------------------------------------------------------------------
 
@@ -420,4 +428,13 @@ public class ResultPartition implements BufferPoolOwner {
 			hasNotifiedPipelinedConsumers = true;
 		}
 	}
+
+	/**
+	 * Gets the type of the ResultPartition
+	 * @return ResultPartitionType
+	 */
+	public ResultPartitionType getPartitionType() {
+		return partitionType;
+	}
+
 }

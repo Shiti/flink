@@ -70,7 +70,7 @@ public class ExecutionVertexSchedulingTest {
 			// a slot than cannot be deployed to
 			final Instance instance = getInstance(ActorRef.noSender());
 			final SimpleSlot slot = instance.allocateSimpleSlot(ejv.getJobId());
-			
+
 			slot.releaseSlot();
 			assertTrue(slot.isReleased());
 
@@ -79,10 +79,13 @@ public class ExecutionVertexSchedulingTest {
 
 			assertEquals(ExecutionState.CREATED, vertex.getExecutionState());
 			// try to deploy to the slot
+			vertex.getCurrentExecutionAttempt().setScheduled();
 			vertex.scheduleForExecution(scheduler, false);
 
 			// will have failed
 			assertEquals(ExecutionState.FAILED, vertex.getExecutionState());
+			vertex.getCurrentExecutionAttempt().setScheduled();
+			assertTrue(slot.isReleased());
 		}
 		catch (Exception e) {
 			e.printStackTrace();
@@ -111,6 +114,7 @@ public class ExecutionVertexSchedulingTest {
 
 			assertEquals(ExecutionState.CREATED, vertex.getExecutionState());
 			// try to deploy to the slot
+			vertex.getCurrentExecutionAttempt().setScheduled();
 			vertex.scheduleForExecution(scheduler, true);
 
 			// future has not yet a slot
@@ -147,6 +151,7 @@ public class ExecutionVertexSchedulingTest {
 			assertEquals(ExecutionState.CREATED, vertex.getExecutionState());
 
 			// try to deploy to the slot
+			vertex.getCurrentExecutionAttempt().setScheduled();
 			vertex.scheduleForExecution(scheduler, false);
 			assertEquals(ExecutionState.DEPLOYING, vertex.getExecutionState());
 		}
