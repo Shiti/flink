@@ -128,7 +128,7 @@ public class Scheduler implements InstanceListener, SlotAvailabilityListener {
 			return (SimpleSlot) ret;
 		}
 		else {
-			throw new RuntimeException();
+			throw new RuntimeException("Failed to schedule task immediately.");
 		}
 	}
 	
@@ -141,7 +141,7 @@ public class Scheduler implements InstanceListener, SlotAvailabilityListener {
 			return (SlotAllocationFuture) ret;
 		}
 		else {
-			throw new RuntimeException();
+			throw new RuntimeException("Failed to schedule task queued.");
 		}
 	}
 	
