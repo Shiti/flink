@@ -30,6 +30,7 @@ import org.apache.flink.core.io.InputSplitAssigner
 import org.apache.flink.runtime.accumulators.StringifiedAccumulatorResult
 import org.apache.flink.runtime.blob.BlobServer
 import org.apache.flink.runtime.client._
+import org.apache.flink.runtime.execution.ExecutionState
 import org.apache.flink.runtime.executiongraph.{ExecutionJobVertex, ExecutionGraph}
 import org.apache.flink.runtime.jobmanager.web.WebInfoServer
 import org.apache.flink.runtime.messages.ArchiveMessages.ArchiveExecutionGraph
@@ -122,8 +123,8 @@ class JobManager(protected val flinkConfiguration: Configuration,
 
     archive ! PoisonPill
 
-    for((e,_) <- currentJobs.values) {
-      e.fail(new Exception("The JobManager is shutting down."))
+    for((executionGraph,_) <- currentJobs.values) {
+      executionGraph.fail(new Exception("The JobManager is shutting down."))
     }
 
     instanceManager.shutdown()
@@ -284,10 +285,10 @@ class JobManager(protected val flinkConfiguration: Configuration,
 
     case JobStatusChanged(jobID, newJobStatus, timeStamp, error) =>
       currentJobs.get(jobID) match {
-        case Some((executionGraph, jobInfo)) => executionGraph.getJobName
-
-          log.info(s"Status of job $jobID (${executionGraph.getJobName}) changed to $newJobStatus.",
-            error)
+        case Some((executionGraph, jobInfo)) =>
+          executionGraph.getJobName
+          log.info(s"Status of job $jobID (${executionGraph.getJobName}) changed to $newJobStatus" +
+            s" ${if (error == null) "" else error.getMessage}.")
 
           if (newJobStatus.isTerminalState) {
             jobInfo.end = timeStamp
@@ -320,7 +321,7 @@ class JobManager(protected val flinkConfiguration: Configuration,
                 jobInfo.client ! Failure(exception)
                 throw exception
             }
-
+//not there in local
             removeJob(jobID)
 
           }
@@ -359,7 +360,8 @@ class JobManager(protected val flinkConfiguration: Configuration,
 
     case RequestJobStatus(jobID) =>
       currentJobs.get(jobID) match {
-        case Some((executionGraph,_)) => sender ! CurrentJobStatus(jobID, executionGraph.getState)
+        case Some((executionGraph,_)) =>
+          sender ! CurrentJobStatus(jobID, executionGraph.getState)
         case None =>
           // check the archive
           archive forward RequestJobStatus(jobID)
