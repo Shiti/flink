@@ -227,7 +227,7 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
 		for (JobVertex vertex : this.vertices.values()) {
 			graph.addVertex(vertex);
 		}
-
+		
 		for (JobVertex vertex : this.auxVertices) {
 			graph.addVertex(vertex);
 			vertex.setSlotSharingGroup(sharingGroup);

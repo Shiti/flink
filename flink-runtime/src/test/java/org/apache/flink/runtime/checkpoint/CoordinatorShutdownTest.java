@@ -54,7 +54,7 @@ public class CoordinatorShutdownTest {
 			noTaskManagerConfig.setInteger(ConfigConstants.LOCAL_NUMBER_TASK_MANAGER, 0);
 			cluster = new LocalFlinkMiniCluster(noTaskManagerConfig, true);
 			cluster.start();
-			
+
 			// build a test graph with snapshotting enabled
 			JobVertex vertex = new JobVertex("Test Vertex");
 			vertex.setInvokableClass(Tasks.NoOpInvokable.class);
@@ -105,7 +105,7 @@ public class CoordinatorShutdownTest {
 		try {
 			cluster = new LocalFlinkMiniCluster(new Configuration(), true);
 			cluster.start();
-			
+
 			// build a test graph with snapshotting enabled
 			JobVertex vertex = new JobVertex("Test Vertex");
 			vertex.setInvokableClass(Tasks.NoOpInvokable.class);

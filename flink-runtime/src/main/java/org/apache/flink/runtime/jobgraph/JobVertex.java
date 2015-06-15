@@ -83,11 +83,11 @@ public class JobVertex implements java.io.Serializable {
 
 	/** Optional, pretty name of the operator, to be displayed in the JSON plan */
 	private String operatorPrettyName;
-	
+
 	/** Optional, the JSON for the optimizer properties of the operator result,
 	 * to be included in the JSON plan */
 	private String resultOptimizerProperties;
-	
+
 	// --------------------------------------------------------------------------------------------
 
 	/**
@@ -447,7 +447,7 @@ public class JobVertex implements java.io.Serializable {
 	}
 
 	// --------------------------------------------------------------------------------------------
-	
+
 	@Override
 	public String toString() {
 		return this.name + " (" + this.invokableClassName + ')';

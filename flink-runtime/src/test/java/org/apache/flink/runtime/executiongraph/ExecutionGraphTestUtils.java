@@ -114,7 +114,7 @@ public class ExecutionGraphTestUtils {
 
 	@SuppressWarnings("serial")
 	public static class SimpleActorGateway extends BaseTestingActorGateway {
-		
+
 		public TaskDeploymentDescriptor lastTDD;
 
 		public SimpleActorGateway(ExecutionContext executionContext){
