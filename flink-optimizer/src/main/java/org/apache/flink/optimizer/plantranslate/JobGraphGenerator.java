@@ -165,12 +165,12 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
 	public JobGraph compileJobGraph(OptimizedPlan program) {
 		return compileJobGraph(program, null);
 	}
-	
+
 	public JobGraph compileJobGraph(OptimizedPlan program, JobID jobId) {
 		if (program == null) {
 			throw new NullPointerException();
 		}
-		
+
 		if (jobId == null) {
 			jobId = JobID.generate();
 		}
@@ -211,11 +211,11 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
 		}
 		
 		// ----- attach the additional info to the job vertices, for display in the runtime monitor
-		
+
 		attachOperatorNamesAndDescriptions();
 
 		// ----------- finalize the job graph -----------
-		
+
 		// create the job graph object
 		JobGraph graph = new JobGraph(jobId, program.getJobName());
 		graph.setNumberOfExecutionRetries(program.getOriginalPlan().getNumberOfExecutionRetries());
@@ -1161,16 +1161,16 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
 		} else {
 			targetConfig.addInputToGroup(inputNumber);
 		}
-		
+
 		// ---------------- attach the additional infos to the job edge -------------------
-		
+
 		String shipStrategy = JsonMapper.getShipStrategyString(channel.getShipStrategy());
 		if (channel.getShipStrategyKeys() != null && channel.getShipStrategyKeys().size() > 0) {
 			shipStrategy += " on " + (channel.getShipStrategySortOrder() == null ?
 					channel.getShipStrategyKeys().toString() :
 					Utils.createOrdering(channel.getShipStrategyKeys(), channel.getShipStrategySortOrder()).toString());
 		}
-		
+
 		String localStrategy;
 		if (channel.getLocalStrategy() == null || channel.getLocalStrategy() == LocalStrategy.NONE) {
 			localStrategy = null;
@@ -1183,13 +1183,13 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
 						Utils.createOrdering(channel.getLocalStrategyKeys(), channel.getLocalStrategySortOrder()).toString());
 			}
 		}
-		
+
 		String caching = channel.getTempMode() == TempMode.NONE ? null : channel.getTempMode().toString();
 
 		edge.setShipStrategyName(shipStrategy);
 		edge.setPreProcessingOperationName(localStrategy);
 		edge.setOperatorLevelCachingDescription(caching);
-		
+
 		return distributionPattern;
 	}
 	
@@ -1543,13 +1543,13 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
 			return null;
 		}
 	}
-	
+
 	private void attachOperatorNamesAndDescriptions() {
 		JsonFactory jsonFactory = new JsonFactory();
 
 		// we go back to front
 
-		// start with the in chains 
+		// start with the in chains
 		for (int i = chainedTasksInSequence.size() - 1; i >= 0; i--) {
 			TaskInChain next = chainedTasksInSequence.get(i);
 			PlanNode planNode = next.getPlanNode();
@@ -1565,7 +1565,7 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
 				vertex.setOperatorName(opName + " -> " + vertex.getOperatorName());
 			}
 
-			// operator description 
+			// operator description
 			String opDescription = JsonMapper.getOperatorStrategyString(planNode.getDriverStrategy());
 			if (vertex.getOperatorDescription() == null) {
 				vertex.setOperatorDescription(opDescription);
@@ -1668,12 +1668,12 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
 		private final String taskName;
 		
 		private final PlanNode planNode;
-		
+
 		private JobVertex containingVertex;
 
 		TaskInChain(PlanNode planNode, Class<? extends ChainedDriver<?, ?>> chainedTask,
 					TaskConfig taskConfig, String taskName) {
-			
+
 			this.planNode = planNode;
 			this.chainedTask = chainedTask;
 			this.taskConfig = taskConfig;
