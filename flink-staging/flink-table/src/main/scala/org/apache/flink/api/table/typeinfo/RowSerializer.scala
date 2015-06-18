@@ -20,6 +20,7 @@ package org.apache.flink.api.table.typeinfo
 import org.apache.flink.api.table.Row
 import org.apache.flink.api.common.typeutils.TypeSerializer
 import org.apache.flink.core.memory.{DataOutputView, DataInputView}
+;
 
 /**
  * Serializer for [[Row]].
