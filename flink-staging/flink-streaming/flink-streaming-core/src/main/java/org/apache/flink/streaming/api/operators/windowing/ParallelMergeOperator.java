@@ -15,35 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.flink.streaming.api.functions.source;
+package org.apache.flink.streaming.api.operators.windowing;
 
-import java.util.Iterator;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.streaming.api.operators.co.CoStreamFlatMap;
+import org.apache.flink.streaming.api.windowing.StreamWindow;
 
-public class FromIteratorFunction<T> implements SourceFunction<T> {
+public class ParallelMergeOperator<OUT> extends CoStreamFlatMap<StreamWindow<OUT>, Tuple2<Integer, Integer>, StreamWindow<OUT>> {
 
-	private static final long serialVersionUID = 1L;
+	private ParallelMerge<OUT> parallelMerge;
 
-	private final Iterator<T> iterator;
-
-	private volatile boolean isRunning = true;
-
-	public FromIteratorFunction(Iterator<T> iterator) {
-		this.iterator = iterator;
+	public ParallelMergeOperator(ParallelMerge<OUT> parallelMerge) {
+		super(parallelMerge);
+		this.parallelMerge = parallelMerge;
 	}
 
 	@Override
-	public void run(SourceContext<T> ctx) throws Exception {
-		while (isRunning && iterator.hasNext()) {
-			ctx.collect(iterator.next());
+	public void close() throws Exception {
+		// emit remaining (partial) windows
+
+		for (Tuple2<StreamWindow<OUT>, Integer> receivedWindow : parallelMerge.getReceivedWindows().values()) {
+			getCollector().collect(receivedWindow.f0);
 		}
-	}
 
-	@Override
-	public void cancel() {
-		isRunning = false;
-	}
-
-	protected TimestampedCollector<OUT> getCollector() {
-		return collector;
+		super.close();
 	}
 }
