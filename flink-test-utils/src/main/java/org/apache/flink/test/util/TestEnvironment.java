@@ -28,13 +28,24 @@ import org.apache.flink.optimizer.Optimizer;
 import org.apache.flink.optimizer.plan.OptimizedPlan;
 import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
 import org.apache.flink.optimizer.plantranslate.JobGraphGenerator;
-import org.apache.flink.runtime.client.SerializedJobExecutionResult;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.junit.Assert;
 
 public class TestEnvironment extends ExecutionEnvironment {
 
 	private final ForkableFlinkMiniCluster executor;
+
+	private TestEnvironment lastEnv = null;
+
+	@Override
+	public JobExecutionResult getLastJobExecutionResult() {
+		if (lastEnv == null) {
+			return this.lastJobExecutionResult;
+		}
+		else {
+			return lastEnv.getLastJobExecutionResult();
+		}
+	}
 
 	public TestEnvironment(ForkableFlinkMiniCluster executor, int parallelism) {
 		this.executor = executor;
@@ -45,7 +56,6 @@ public class TestEnvironment extends ExecutionEnvironment {
 
 	@Override
 	public void startNewSession() throws Exception {
-
 	}
 
 	@Override
@@ -56,9 +66,7 @@ public class TestEnvironment extends ExecutionEnvironment {
 			JobGraphGenerator jgg = new JobGraphGenerator();
 			JobGraph jobGraph = jgg.compileJobGraph(op);
 			
-			SerializedJobExecutionResult result = executor.submitJobAndWait(jobGraph, false);
-
-			this.lastJobExecutionResult = result.toJobExecutionResult(getClass().getClassLoader());
+			this.lastJobExecutionResult = executor.submitJobAndWait(jobGraph, false);
 			return this.lastJobExecutionResult;
 		}
 		catch (Exception e) {
@@ -82,7 +90,7 @@ public class TestEnvironment extends ExecutionEnvironment {
 	private OptimizedPlan compileProgram(String jobName) {
 		Plan p = createProgramPlan(jobName);
 
-		Optimizer pc = new Optimizer(new DataStatistics(), this.executor.getConfiguration());
+		Optimizer pc = new Optimizer(new DataStatistics(), this.executor.configuration());
 		return pc.compile(p);
 	}
 
@@ -90,7 +98,8 @@ public class TestEnvironment extends ExecutionEnvironment {
 		ExecutionEnvironmentFactory factory = new ExecutionEnvironmentFactory() {
 			@Override
 			public ExecutionEnvironment createExecutionEnvironment() {
-				return TestEnvironment.this;
+				lastEnv = new TestEnvironment(executor, getParallelism());
+				return lastEnv;
 			}
 		};
 

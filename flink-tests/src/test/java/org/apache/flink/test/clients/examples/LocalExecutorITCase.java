@@ -57,7 +57,6 @@ public class LocalExecutorITCase {
 			executor.start();
 			Plan wcPlan = wc.getPlan(Integer.valueOf(parallelism).toString(),
 					inFile.toURI().toString(), outFile.toURI().toString());
-
 			wcPlan.setExecutionConfig(new ExecutionConfig());
 			executor.executePlan(wcPlan);
 			executor.stop();

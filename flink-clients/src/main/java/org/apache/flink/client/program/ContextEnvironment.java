@@ -22,9 +22,9 @@ import java.io.File;
 import java.util.List;
 
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.Plan;
-import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.ExecutionEnvironmentFactory;
 import org.apache.flink.optimizer.plan.OptimizedPlan;
@@ -40,15 +40,14 @@ public class ContextEnvironment extends ExecutionEnvironment {
 	private static final Logger LOG = LoggerFactory.getLogger(ContextEnvironment.class);
 
 	private final Client client;
-	
+
 	private final List<File> jarFilesToAttach;
-	
+
 	private final ClassLoader userCodeClassLoader;
 
 	private final boolean wait;
-	
-	
-	
+
+
 	public ContextEnvironment(Client remoteConnection, List<File> jarFiles, ClassLoader userCodeClassLoader, boolean wait) {
 		this.client = remoteConnection;
 		this.jarFilesToAttach = jarFiles;
@@ -57,17 +56,10 @@ public class ContextEnvironment extends ExecutionEnvironment {
 	}
 
 	@Override
-	public void startNewSession() throws Exception {
-		client.endSession();
-		jobID = JobID.generate();
-	}
-
-	@Override
 	public JobExecutionResult execute(String jobName) throws Exception {
 		Plan p = createProgramPlan(jobName);
 		JobWithJars toRun = new JobWithJars(p, this.jarFilesToAttach, this.userCodeClassLoader);
-
-		this.client.setJobID(jobID);
+/*this.client.setJobID(jobID);
 		this.client.setSessionTimeout(sessionTimeout);
 		JobSubmissionResult result = this.client.run(toRun, getParallelism(), wait);
 		if(result instanceof JobExecutionResult) {
@@ -77,17 +69,32 @@ public class ContextEnvironment extends ExecutionEnvironment {
 			LOG.warn("The Client didn't return a JobExecutionResult");
 			this.lastJobExecutionResult = new JobExecutionResult(result.getJobID(), -1, null);
 			return this.lastJobExecutionResult;
+		}*/
+		if (wait) {
+			this.lastJobExecutionResult = client.runBlocking(toRun, getParallelism());
+			return this.lastJobExecutionResult;
+		}
+		else {
+			JobSubmissionResult result = client.runDetached(toRun, getParallelism());
+			LOG.warn("Job was executed in detached mode, the results will be available on completion.");
+			this.lastJobExecutionResult = JobExecutionResult.fromJobSubmissionResult(result);
+			return this.lastJobExecutionResult;
 		}
 	}
 
 	@Override
 	public String getExecutionPlan() throws Exception {
-		Plan p = createProgramPlan("unnamed job");
-		
-		OptimizedPlan op = (OptimizedPlan) this.client.getOptimizedPlan(p, getParallelism());
+		Plan plan = createProgramPlan("unnamed job");
 
+		OptimizedPlan op = Client.getOptimizedPlan(client.compiler, plan, getParallelism());
 		PlanJSONDumpGenerator gen = new PlanJSONDumpGenerator();
 		return gen.getOptimizerPlanAsJSON(op);
+	}
+
+	@Override
+	public void startNewSession() throws Exception {
+		client.endSession(jobID);
+		jobID = JobID.generate();
 	}
 
 	public boolean isWait() {
@@ -113,7 +120,9 @@ public class ContextEnvironment extends ExecutionEnvironment {
 	static void setAsContext(Client client, List<File> jarFilesToAttach, 
 				ClassLoader userCodeClassLoader, int defaultParallelism, boolean wait)
 	{
-		initializeContextEnvironment(new ContextEnvironmentFactory(client, jarFilesToAttach, userCodeClassLoader, defaultParallelism, wait));
+		ContextEnvironmentFactory factory =
+				new ContextEnvironmentFactory(client, jarFilesToAttach, userCodeClassLoader, defaultParallelism, wait);
+		initializeContextEnvironment(factory);
 	}
 	
 	protected static void enableLocalExecution(boolean enabled) {

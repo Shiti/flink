@@ -21,13 +21,18 @@ package org.apache.flink.client;
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.io.DiscardingOutputFormat;
+import org.apache.flink.configuration.Configuration;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Collections;
 
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeTrue;
 
 public class RemoteExecutorHostnameResolutionTest {
 
@@ -37,13 +42,17 @@ public class RemoteExecutorHostnameResolutionTest {
 	
 	@Test
 	public void testUnresolvableHostname1() {
+		
+		checkPreconditions();
+		
 		try {
 			RemoteExecutor exec = new RemoteExecutor(nonExistingHostname, port);
 			exec.executePlan(getProgram());
-			fail("This should fail with an UnknownHostException");
+			fail("This should fail with an ProgramInvocationException");
 		}
-		catch (UnknownHostException e) {
+		catch (IOException e) {
 			// that is what we want!
+			assertTrue(e.getCause() instanceof UnknownHostException);
 		}
 		catch (Exception e) {
 			System.err.println("Wrong exception!");
@@ -54,14 +63,18 @@ public class RemoteExecutorHostnameResolutionTest {
 
 	@Test
 	public void testUnresolvableHostname2() {
+
+		checkPreconditions();
+		
 		try {
 			InetSocketAddress add = new InetSocketAddress(nonExistingHostname, port);
-			RemoteExecutor exec = new RemoteExecutor(add, Collections.<String>emptyList());
+			RemoteExecutor exec = new RemoteExecutor(add, Collections.<String>emptyList(), new Configuration());
 			exec.executePlan(getProgram());
-			fail("This should fail with an UnknownHostException");
+			fail("This should fail with an ProgramInvocationException");
 		}
-		catch (UnknownHostException e) {
+		catch (IOException e) {
 			// that is what we want!
+			assertTrue(e.getCause() instanceof UnknownHostException);
 		}
 		catch (Exception e) {
 			System.err.println("Wrong exception!");
@@ -74,5 +87,21 @@ public class RemoteExecutorHostnameResolutionTest {
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 		env.fromElements(1, 2, 3).output(new DiscardingOutputFormat<Integer>());
 		return env.createProgramPlan();
+	}
+
+	private static void checkPreconditions() {
+		// the test can only work if the invalid URL cannot be resolves
+		// some internet providers resolve unresolvable URLs to navigational aid servers,
+		// voiding this test.
+		boolean throwsException;
+		try {
+			//noinspection ResultOfMethodCallIgnored
+			InetAddress.getByName(nonExistingHostname);
+			throwsException = false;
+		}
+		catch (UnknownHostException e) {
+			throwsException = true;
+		}
+		assumeTrue(throwsException);
 	}
 }

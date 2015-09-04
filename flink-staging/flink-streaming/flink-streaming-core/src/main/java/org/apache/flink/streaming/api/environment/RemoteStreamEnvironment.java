@@ -19,23 +19,23 @@ package org.apache.flink.streaming.api.environment;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.flink.api.common.JobExecutionResult;
-import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.client.program.Client;
 import org.apache.flink.client.program.JobWithJars;
 import org.apache.flink.client.program.ProgramInvocationException;
+import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RemoteStreamEnvironment extends StreamExecutionEnvironment {
+	
 	private static final Logger LOG = LoggerFactory.getLogger(RemoteStreamEnvironment.class);
 
 	private final String host;
@@ -84,15 +84,15 @@ public class RemoteStreamEnvironment extends StreamExecutionEnvironment {
 
 	@Override
 	public JobExecutionResult execute() throws ProgramInvocationException {
-
-		JobGraph jobGraph = streamGraph.getJobGraph();
+		JobGraph jobGraph = getStreamGraph().getJobGraph();
+		transformations.clear();
 		return executeRemotely(jobGraph);
 	}
 
 	@Override
 	public JobExecutionResult execute(String jobName) throws ProgramInvocationException {
-
-		JobGraph jobGraph = streamGraph.getJobGraph(jobName);
+		JobGraph jobGraph = getStreamGraph().getJobGraph(jobName);
+		transformations.clear();
 		return executeRemotely(jobGraph);
 	}
 
@@ -115,27 +115,30 @@ public class RemoteStreamEnvironment extends StreamExecutionEnvironment {
 		Configuration configuration = jobGraph.getJobConfiguration();
 		ClassLoader usercodeClassLoader = JobWithJars.buildUserCodeClassLoader(jarFiles, getClass().getClassLoader());
 
+		configuration.setString(ConfigConstants.JOB_MANAGER_IPC_ADDRESS_KEY, host);
+		configuration.setInteger(ConfigConstants.JOB_MANAGER_IPC_PORT_KEY, port);
+
+		Client client;
 		try {
-			Client client = new Client(new InetSocketAddress(host, port), configuration, usercodeClassLoader, -1);
+			client = new Client(configuration);
 			client.setPrintStatusDuringExecution(getConfig().isSysoutLoggingEnabled());
-			
-			JobSubmissionResult result = client.run(jobGraph, true);
-			if (result instanceof JobExecutionResult) {
-				return (JobExecutionResult) result;
-			} else {
-				LOG.warn("The Client didn't return a JobExecutionResult");
-				return new JobExecutionResult(result.getJobID(), -1, null);
-			}
+		}
+		catch (Exception e) {
+			throw new ProgramInvocationException("Cannot establish connection to JobManager: " + e.getMessage(), e);
+		}
+
+		try {
+			return client.runBlocking(jobGraph, usercodeClassLoader);
 		}
 		catch (ProgramInvocationException e) {
 			throw e;
 		}
-		catch (UnknownHostException e) {
-			throw new ProgramInvocationException(e.getMessage(), e);
-		}
 		catch (Exception e) {
 			String term = e.getMessage() == null ? "." : (": " + e.getMessage());
 			throw new ProgramInvocationException("The program execution failed" + term, e);
+		}
+		finally {
+			client.shutdown();
 		}
 	}
 
