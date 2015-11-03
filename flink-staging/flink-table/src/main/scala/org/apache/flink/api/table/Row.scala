@@ -21,9 +21,11 @@ package org.apache.flink.api.table
  * This is used for executing Table API operations. We use manually generated
  * TypeInfo to check the field types and create serializers and comparators.
  */
-class Row(arity: Int) extends Product {
+class Row(_fields: Array[Any]) extends Product {
 
-  private val fields = new Array[Any](arity)
+  private var fields: Array[Any] = _fields
+
+  def this(len: Int) = this(new Array[Any](len))
 
   def productArity = fields.length
 
@@ -32,6 +34,10 @@ class Row(arity: Int) extends Product {
   def setField(i: Int, value: Any): Unit = fields(i) = value
 
   def canEqual(that: Any) = false
+
+  def elementArray = fields
+
+  def setFields(f: Array[Any]) = Array.copy(f, 0, fields, 0, productArity)
 
   override def toString = fields.mkString(",")
 

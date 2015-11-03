@@ -44,6 +44,9 @@ class RowSerializer(fieldSerializers: Array[TypeSerializer[Any]])
     if (from.productArity != len) {
       throw new RuntimeException("Row arity of reuse and from do not match.")
     }
+
+    reuse.setFields(from.elementArray.clone())
+    /*
     var i = 0
     while (i < len) {
       val reuseField = reuse.productElement(i)
@@ -51,7 +54,7 @@ class RowSerializer(fieldSerializers: Array[TypeSerializer[Any]])
       val copy = fieldSerializers(i).copy(fromField, reuseField)
       reuse.setField(i, copy)
       i += 1
-    }
+    }*/
     reuse
   }
 
