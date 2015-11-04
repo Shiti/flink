@@ -1,0 +1,8 @@
+.idea
+*.iml
+target/
+*output.xml
+generated/
+.version.properties
+build-target
+
