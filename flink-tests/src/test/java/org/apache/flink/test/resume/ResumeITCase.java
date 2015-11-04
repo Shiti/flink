@@ -31,7 +31,7 @@ import org.apache.flink.runtime.executiongraph.IntermediateResultPartition;
 import org.apache.flink.runtime.io.network.api.reader.RecordReader;
 import org.apache.flink.runtime.io.network.api.writer.RecordWriter;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
-import org.apache.flink.runtime.jobgraph.AbstractJobVertex;
+import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.DistributionPattern;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSet;
 import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
@@ -96,12 +96,12 @@ public class ResumeITCase {
 
          */
 
-		AbstractJobVertex source = new AbstractJobVertex("source");
+		JobVertex source = new JobVertex("source");
 		source.setInvokableClass(Sender.class);
 
 		final IntermediateDataSet intermediateResult = source.createAndAddResultDataSet(ResultPartitionType.BLOCKING);
 
-		final AbstractJobVertex receiver = new AbstractJobVertex("receiver");
+		final JobVertex receiver = new JobVertex("receiver");
 		receiver.setInvokableClass(Receiver.class);
 		receiver.connectDataSetAsInput(intermediateResult, DistributionPattern.ALL_TO_ALL);
 
@@ -110,7 +110,7 @@ public class ResumeITCase {
 		jobGraph1.setScheduleMode(ScheduleMode.BACKTRACKING);
 		jobGraph1.setParallelism(PARALLELISM);
 
-		final AbstractJobVertex sink = new AbstractJobVertex("sink");
+		final JobVertex sink = new JobVertex("sink");
 		sink.setInvokableClass(Receiver.class);
 		sink.setResumeFromIntermediateResult();
 

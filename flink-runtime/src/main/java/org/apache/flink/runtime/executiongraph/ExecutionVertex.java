@@ -221,10 +221,6 @@ public class ExecutionVertex implements Serializable {
 		this.operatorState = operatorState;
 	}
 
-	public StateHandle getOperatorState() {
-		return operatorState;
-	}
-
 	public ExecutionGraph getExecutionGraph() {
 		return this.jobVertex.getGraph();
 	}
@@ -430,9 +426,9 @@ public class ExecutionVertex implements Serializable {
 					this.locationConstraint = grp.getLocationConstraint(subTaskIndex);
 				}
 				
-				if (operatorState != null) {
+				/*if (operatorState != null) {
 					execution.setOperatorState(operatorState);
-				}
+				}*/
 				
 			}
 			else {

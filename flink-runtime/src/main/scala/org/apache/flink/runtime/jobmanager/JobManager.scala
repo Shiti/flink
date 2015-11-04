@@ -194,7 +194,7 @@ class JobManager(protected val flinkConfiguration: Configuration,
       log.info(s"Trying to cancel job with ID $jobID.")
 
       currentJobs.get(jobID) match {
-        case Some((executionGraph, _)) =>
+        case Some((executionGraph, _)) if executionGraph.getJobID == jobID =>
           // execute the cancellation asynchronously
           Future {
             executionGraph.cancel()

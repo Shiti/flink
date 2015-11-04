@@ -477,7 +477,7 @@ public class JobGraph implements Serializable {
 	 * @param parallelism
 	 */
 	public void setParallelism(int parallelism) {
-		for (AbstractJobVertex ejv : taskVertices.values()) {
+		for (JobVertex ejv : taskVertices.values()) {
 			ejv.setParallelism(parallelism);
 		}
 	}
