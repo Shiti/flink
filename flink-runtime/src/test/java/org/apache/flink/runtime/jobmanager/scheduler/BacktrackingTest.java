@@ -226,7 +226,7 @@ public class BacktrackingTest {
 				final Props props = Props.create(TestTaskManager.class, getRef());
 				final ActorRef taskManagerActor = system.actorOf(props);
 
-				eg.setScheduleMode(ScheduleMode.BACKTRACKING);
+//				eg.setScheduleMode(ScheduleMode.BACKTRACKING);
 
 				try {
 					eg.attachJobGraph(list);
@@ -344,7 +344,7 @@ public class BacktrackingTest {
 		final ExecutionGraph eg = new ExecutionGraph(jobId, jobName, cfg, AkkaUtils.getDefaultTimeout(),
 				new ArrayList<BlobKey>(), ExecutionGraph.class.getClassLoader());
 
-		eg.setScheduleMode(ScheduleMode.BACKTRACKING);
+//		eg.setScheduleMode(ScheduleMode.BACKTRACKING);
 
 		try {
 			eg.attachJobGraph(allNodes);

@@ -84,7 +84,7 @@ public class JobGraph implements Serializable {
 	private boolean allowQueuedScheduling;
 
 	/** The mode in which the job is scheduled */
-	private ScheduleMode scheduleMode = ScheduleMode.FROM_SOURCES;
+	private ScheduleMode scheduleMode = ScheduleMode.BACKTRACKING;
 	
 	/** The settings for asynchronous snapshotting */
 	private JobSnapshottingSettings snapshotSettings;

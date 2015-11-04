@@ -168,7 +168,7 @@ public class ExecutionGraph implements Serializable {
 	/** The mode of scheduling. Decides how to select the initial set of tasks to be deployed.
 	 * May indicate to deploy all sources, or to deploy everything, or to deploy via backtracking
 	 * from results that need to be materialized. */
-	private ScheduleMode scheduleMode = ScheduleMode.FROM_SOURCES;
+	private ScheduleMode scheduleMode = ScheduleMode.BACKTRACKING;
 
 	/** Flag that indicate whether the executed dataflow should be periodically snapshotted */
 	private boolean snapshotCheckpointsEnabled;
@@ -182,10 +182,6 @@ public class ExecutionGraph implements Serializable {
 	/** The exception that caused the job to fail. This is set to the first root exception
 	 * that was not recoverable and triggered job failure */
 	private volatile Throwable failureCause;
-
-	/** The number of job vertices that have reached a terminal state */
-	private volatile int numFinishedJobVertices;
-
 
 	// ------ Fields that are relevant to the execution and need to be cleared before archiving  -------
 
@@ -651,7 +647,6 @@ public class ExecutionGraph implements Serializable {
 				for (int i = 0; i < stateTimestamps.length; i++) {
 					stateTimestamps[i] = 0;
 				}
-				numFinishedJobVertices = 0;
 				transitionState(JobStatus.RESTARTING, JobStatus.CREATED);
 
 				// if we have checkpointed state, reload it into the executions
