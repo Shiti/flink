@@ -142,7 +142,16 @@ public class LocalFileSystem extends FileSystem {
 	@Override
 	public FSDataInputStream open(final Path f) throws IOException {
 		final File file = pathToFile(f);
-		return mmapReadEnabled ? new LocalMappedDataInputStream(file) : new LocalDataInputStream(file);
+		FSDataInputStream fsdis = null;
+
+		if(mmapReadEnabled) {
+			LOG.warn("Using memory mapped file");
+			fsdis = new LocalMappedDataInputStream(file);
+		} else {
+			LOG.info("Using non mapped file");
+			fsdis = new LocalDataInputStream(file);
+		}
+		return fsdis;
 	}
 
 

@@ -101,8 +101,14 @@ public class LocalMappedDataInputStream extends FSDataInputStream {
 
 	@Override
 	public int read(final byte[] buffer, final int offset, final int length) throws IOException {
-		long cpos = this.currentStartAt + this.mbb.position();
+		long cpos = getPos();
 		long remaining = this.fileSize  - cpos;
+
+		if(remaining == 0) {
+			//Do nothing and just return -1 EOF
+			return -1;
+		}
+
 		int respSize = (int) (remaining > length ? length : remaining);
 
 		if(this.mbb.remaining() < respSize){
@@ -123,7 +129,7 @@ public class LocalMappedDataInputStream extends FSDataInputStream {
 	@Override
 	public int available() throws IOException {
 		//Note: This is not the remaining number of bytes, but bytes that can be read without blocking.
-		return this.mbb.remaining();
+		return (int) (this.fileSize - getPos());
 	}
 
 
