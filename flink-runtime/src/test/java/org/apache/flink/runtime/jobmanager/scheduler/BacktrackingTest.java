@@ -27,6 +27,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.akka.AkkaUtils;
+import org.apache.flink.runtime.blob.BlobKey;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
@@ -108,13 +109,13 @@ public class BacktrackingTest {
 	}
 
 	@Before
-	public void setup(){
+	public void setup() {
 		system = ActorSystem.create("TestingActorSystem", TestingUtils.testConfig());
 		TestingUtils.setCallingThreadDispatcher(system);
 	}
 
 	@After
-	public void teardown(){
+	public void teardown() {
 		TestingUtils.setGlobalExecutionContext();
 		JavaTestKit.shutdownActorSystem(system);
 	}
@@ -147,7 +148,7 @@ public class BacktrackingTest {
 		final AbstractJobVertex resumePoint;
 
         /*
-               sink1         sink2
+			   sink1         sink2
                  O             O
                  ^             ^
                 ´ `           ´ `
@@ -216,7 +217,8 @@ public class BacktrackingTest {
 		list.add(node1);
 		list.add(node2);
 
-		final ExecutionGraph eg = new ExecutionGraph(jobId, jobName, cfg, AkkaUtils.getDefaultTimeout());
+		final ExecutionGraph eg = new ExecutionGraph(jobId, jobName, cfg, AkkaUtils.getDefaultTimeout(),
+				new ArrayList<BlobKey>(), ExecutionGraph.class.getClassLoader());
 
 		new JavaTestKit(system) {
 			{
@@ -339,7 +341,8 @@ public class BacktrackingTest {
 
 		}
 
-		final ExecutionGraph eg = new ExecutionGraph(jobId, jobName, cfg, AkkaUtils.getDefaultTimeout());
+		final ExecutionGraph eg = new ExecutionGraph(jobId, jobName, cfg, AkkaUtils.getDefaultTimeout(),
+				new ArrayList<BlobKey>(), ExecutionGraph.class.getClassLoader());
 
 		eg.setScheduleMode(ScheduleMode.BACKTRACKING);
 
@@ -375,7 +378,7 @@ public class BacktrackingTest {
 					fail("Failed to schedule ExecutionGraph");
 				}
 
-				for (int i=0; i < numSinks * parallelism; i++) {
+				for (int i = 0; i < numSinks * parallelism; i++) {
 					// all sources should be scheduled
 					expectMsgClass(duration("1 second"), TaskMessages.SubmitTask.class);
 				}

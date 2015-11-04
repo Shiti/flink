@@ -213,7 +213,7 @@ class JobManager(protected val flinkConfiguration: Configuration,
         sender ! false
       } else {
         currentJobs.get(taskExecutionState.getJobID) match {
-          case Some((executionGraph, _)) if graph.getJobID == taskExecutionState.getJobID =>
+          case Some((executionGraph, _)) if executionGraph.getJobID == taskExecutionState.getJobID =>
             val originalSender = sender()
 
             Future {
@@ -359,7 +359,7 @@ class JobManager(protected val flinkConfiguration: Configuration,
 
     case RequestJobStatus(jobID) =>
       currentJobs.get(jobID) match {
-        case Some((executionGraph,_)) if executionGraph.getJobID == jobId  =>
+        case Some((executionGraph,_)) if executionGraph.getJobID == jobID  =>
           sender ! CurrentJobStatus(jobID, executionGraph.getState)
         case None =>
           // check the archive
@@ -481,21 +481,6 @@ class JobManager(protected val flinkConfiguration: Configuration,
           throw new JobSubmissionException(jobId, "The given job is empty")
         }
 
-        /*executionGraph = currentJob match {
-          case Some((graph, _)) if !graph.getState.isTerminalState =>
-              throw new Exception("Job still running")
-          case Some((graph, _)) if graph.getJobID == jobId &&
-                                   graph.getScheduleMode == ScheduleMode.BACKTRACKING =>
-            graph.prepareForResuming()
-            graph
-          case _ =>
-            removeCurrentJob()
-            val newGraph = new ExecutionGraph(jobGraph.getJobID, jobGraph.getName,
-              jobGraph.getJobConfiguration, timeout, jobGraph.getUserJarBlobKeys, userCodeLoader)
-            val newJobInfo = JobInfo(sender(), System.currentTimeMillis())
-            currentJob = Option(newGraph, newJobInfo)
-            newGraph
-        }*/
         // see if there already exists an ExecutionGraph for the corresponding job ID
         executionGraph = currentJobs.getOrElseUpdate(jobGraph.getJobID,
           (new ExecutionGraph(jobGraph.getJobID, jobGraph.getName,
@@ -512,10 +497,7 @@ class JobManager(protected val flinkConfiguration: Configuration,
         executionGraph.setDelayBeforeRetrying(delayBetweenRetries)
         executionGraph.setScheduleMode(jobGraph.getScheduleMode)
         executionGraph.setQueuedSchedulingAllowed(jobGraph.getAllowQueuedScheduling)
-/*
-        executionGraph.setCheckpointingEnabled(jobGraph.isCheckpointingEnabled)
-        executionGraph.setCheckpointingInterval(jobGraph.getCheckpointingInterval)
-*/
+
         // initialize the vertices that have a master initialization hook
         // file output formats create directories here, input formats create splits
         if (log.isDebugEnabled) {
@@ -556,9 +538,6 @@ class JobManager(protected val flinkConfiguration: Configuration,
         if (log.isDebugEnabled) {
           log.debug(s"Successfully created execution graph from job graph ${jobId} (${jobName}).")
         }
-
-        /*// give an actorContext
-        executionGraph.setParentContext(context)*/
 
         // configure the state checkpointing
         val snapshotSettings = jobGraph.getSnapshotSettings
@@ -984,27 +963,6 @@ object JobManager {
       } text {
         "The execution mode of the JobManager (CLUSTER / LOCAL)"
       }
-      /*
-      opt[String]("executionMode") action { (arg, c) =>
-        val argLower = arg.toLowerCase()
-        var result: JobManagerCLIConfiguration = null
-
-        for (mode <- JobManagerMode.values() if result == null) {
-          val modeName = mode.name().toLowerCase()
-
-          if (modeName.equals(argLower)) {
-            result = c.copy(executionMode = mode)
-          }
-        }
-
-        if (result == null) {
-          throw new Exception("Unknown execution mode: " + arg)
-        } else {
-          result
-        }
-      } text {
-        "The execution mode of the JobManager (CLUSTER / LOCAL)"
-      }*/
 
       opt[String]("streamingMode").optional().action { (arg, conf) =>
         conf.setStreamingMode(arg)

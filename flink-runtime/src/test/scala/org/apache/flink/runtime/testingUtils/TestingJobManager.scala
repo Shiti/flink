@@ -24,12 +24,9 @@ import org.apache.flink.api.common.JobID
 import org.apache.flink.runtime.ActorLogMessages
 import org.apache.flink.runtime.execution.ExecutionState
 import org.apache.flink.runtime.jobgraph.JobStatus
-import org.apache.flink.runtime.jobmanager.{JobManager, MemoryArchivist}
-import org.apache.flink.runtime.messages.ExecutionGraphMessages.{ExecutionStateChanged,
-JobStatusChanged}
-import org.apache.flink.runtime.messages.JobManagerMessages.ScheduleOrUpdateConsumers
+import org.apache.flink.runtime.jobmanager.JobManager
+import org.apache.flink.runtime.messages.ExecutionGraphMessages.JobStatusChanged
 import org.apache.flink.runtime.messages.Messages.Disconnect
-import org.apache.flink.runtime.messages.TaskMessages.UpdateTaskExecutionState
 import org.apache.flink.runtime.testingUtils.TestingJobManagerMessages._
 import org.apache.flink.runtime.testingUtils.TestingMessages.DisableDisconnect
 
@@ -68,9 +65,9 @@ trait TestingJobManager extends ActorLogMessages with WrapAsScala {
 
   def receiveTestingMessages: Receive = {
     case RequestExecutionGraph(jobID) =>
-      currentJob match {
-        case Some((executionGraph, jobInfo)) if executionGraph.getJobID == jobID =>
-          sender ! ExecutionGraphFound(jobID, executionGraph)
+      currentJobs.get(jobID) match {
+        case Some((executionGraph, jobInfo)) => sender ! ExecutionGraphFound(jobID,
+          executionGraph)
         case None => archive.tell(RequestExecutionGraph(jobID), sender)
       }
 
@@ -100,10 +97,8 @@ trait TestingJobManager extends ActorLogMessages with WrapAsScala {
       }
 
     case NotifyListeners =>
-      currentJob match {
-        case Some((eg, _)) =>
-          notifyListeners(eg.getJobID)
-        case None =>
+      for(jobID <- currentJobs.keySet){
+        notifyListeners(jobID)
       }
 
       if(waitForAllVerticesToBeRunning.isEmpty && waitForAllVerticesToBeRunningOrFinished.isEmpty) {
@@ -139,8 +134,8 @@ trait TestingJobManager extends ActorLogMessages with WrapAsScala {
       }
 
     case RequestWorkingTaskManager(jobID) =>
-      currentJob match {
-        case Some((eg, _)) if eg.getJobID == jobID =>
+      currentJobs.get(jobID) match {
+        case Some((eg, _)) =>
           if(eg.getAllExecutionVertices.isEmpty){
             sender ! WorkingTaskManager(ActorRef.noSender)
           } else {
@@ -203,16 +198,16 @@ trait TestingJobManager extends ActorLogMessages with WrapAsScala {
   }
 
   def checkIfAllVerticesRunning(jobID: JobID): Boolean = {
-    currentJob match {
-      case Some((eg, _)) if eg.getJobID == jobID =>
+    currentJobs.get(jobID) match {
+      case Some((eg, _)) =>
         eg.getAllExecutionVertices.forall( _.getExecutionState == ExecutionState.RUNNING)
       case None => false
     }
   }
 
   def checkIfAllVerticesRunningOrFinished(jobID: JobID): Boolean = {
-    currentJob match {
-      case Some((eg, _)) if eg.getJobID == jobID =>
+    currentJobs.get(jobID) match {
+      case Some((eg, _)) =>
         eg.getAllExecutionVertices.forall {
           case vertex =>
             (vertex.getExecutionState == ExecutionState.RUNNING
