@@ -370,11 +370,16 @@ public class TaskManagerTest {
 		new JavaTestKit(system){{
 
 			ActorRef jobManager = system.actorOf(Props.create(SimpleJobManager.class));
-			ActorRef taskManager = createTaskManager(jobManager, true);
+			ActorGateway taskManager =TestingUtils.createTaskManager(
+					system,
+					jobManager,
+					new Configuration(),
+					true,
+					true);
 
 			// send a non-existing partition id to the task manager
 			IntermediateResultPartitionID partitionID = new IntermediateResultPartitionID();
-			taskManager.tell(
+			taskManager.actor().tell(
 					new TaskMessages.LockResultPartition(partitionID, 1),
 					getRef());
 

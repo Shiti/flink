@@ -25,13 +25,14 @@ import akka.testkit.JavaTestKit;
 import akka.util.Timeout;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.akka.ListeningBehaviour;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.IntermediateResult;
 import org.apache.flink.runtime.executiongraph.IntermediateResultPartition;
 import org.apache.flink.runtime.io.network.api.reader.RecordReader;
 import org.apache.flink.runtime.io.network.api.writer.RecordWriter;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
-import org.apache.flink.runtime.jobgraph.AbstractJobVertex;
+import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.DistributionPattern;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSet;
 import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
@@ -68,12 +69,12 @@ public class ResumeITCase {
 	@Before
 	public void setup(){
 		system = ActorSystem.create("TestingActorSystem", TestingUtils.testConfig());
-		TestingUtils.setCallingThreadDispatcher(system);
+//		TestingUtils.setCallingThreadDispatcher(system);
 	}
 
 	@After
 	public void teardown(){
-		TestingUtils.setGlobalExecutionContext();
+//		TestingUtils.setGlobalExecutionContext();
 		JavaTestKit.shutdownActorSystem(system);
 	}
 
@@ -96,12 +97,12 @@ public class ResumeITCase {
 
          */
 
-		AbstractJobVertex source = new AbstractJobVertex("source");
+		JobVertex source = new JobVertex("source");
 		source.setInvokableClass(Sender.class);
 
 		final IntermediateDataSet intermediateResult = source.createAndAddResultDataSet(ResultPartitionType.BLOCKING);
 
-		final AbstractJobVertex receiver = new AbstractJobVertex("receiver");
+		final JobVertex receiver = new JobVertex("receiver");
 		receiver.setInvokableClass(Receiver.class);
 		receiver.connectDataSetAsInput(intermediateResult, DistributionPattern.ALL_TO_ALL);
 
@@ -110,7 +111,7 @@ public class ResumeITCase {
 		jobGraph1.setScheduleMode(ScheduleMode.BACKTRACKING);
 		jobGraph1.setParallelism(PARALLELISM);
 
-		final AbstractJobVertex sink = new AbstractJobVertex("sink");
+		final JobVertex sink = new JobVertex("sink");
 		sink.setInvokableClass(Receiver.class);
 		sink.setResumeFromIntermediateResult();
 
@@ -123,7 +124,7 @@ public class ResumeITCase {
 
 		ForkableFlinkMiniCluster cluster = ForkableFlinkMiniCluster.startCluster(2 * PARALLELISM, 1, TestingUtils.DEFAULT_AKKA_ASK_TIMEOUT());
 
-		final ActorRef jobManager = cluster.getJobManager();
+		final ActorRef jobManager = cluster.getJobManagersAsJava().get(0);
 		final ActorRef taskManager = cluster.getTaskManagersAsJava().get(0);
 
 
@@ -133,7 +134,7 @@ public class ResumeITCase {
 				protected void run() {
 					taskManager.tell(new TestingTaskManagerMessages.NotifyWhenTaskSubmitted(jobId), getRef());
 
-					jobManager.tell(new SubmitJob(jobGraph1, false), getRef());
+					jobManager.tell(new SubmitJob(jobGraph1, ListeningBehaviour.EXECUTION_RESULT_AND_STATE_CHANGES), getRef());
 					expectMsgClass(Success.class);
 
 					// TODO check caching of intermediate result
@@ -170,7 +171,7 @@ public class ResumeITCase {
 					}
 
 					// submit second job and register for execution graph changes
-					jobManager.tell(new SubmitJob(jobGraph2, false), getRef());
+					jobManager.tell(new SubmitJob(jobGraph2, ListeningBehaviour.EXECUTION_RESULT_AND_STATE_CHANGES), getRef());
 					expectMsgClass(Success.class);
 
 

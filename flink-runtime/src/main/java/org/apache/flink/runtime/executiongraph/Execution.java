@@ -1038,12 +1038,4 @@ public class Execution implements Serializable {
 		return String.format("Attempt #%d (%s) @ %s - [%s]", attemptNumber, vertex.getSimpleName(),
 				(assignedResource == null ? "(unassigned)" : assignedResource.toString()), state);
 	}
-
-	public void setOperatorState(StateHandle operatorStates) {
-		this.operatorState = operatorStates;
-	}
-
-	public StateHandle getOperatorState() {
-		return operatorState;
-	}
 }

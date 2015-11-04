@@ -99,8 +99,6 @@ public class ExecutionVertex implements Serializable {
 
 	private volatile boolean scheduleLocalOnly;
 
-	private StateHandle operatorState;
-
 	// --------------------------------------------------------------------------------------------
 
 	public ExecutionVertex(
@@ -239,14 +237,6 @@ public class ExecutionVertex implements Serializable {
 		else {
 			throw new IllegalArgumentException("attempt does not exist");
 		}
-	}
-
-	public void setOperatorState(StateHandle operatorState) {
-		this.operatorState = operatorState;
-	}
-
-	public StateHandle getOperatorState() {
-		return operatorState;
 	}
 
 	public ExecutionGraph getExecutionGraph() {
@@ -457,11 +447,6 @@ public class ExecutionVertex implements Serializable {
 				if (grp != null) {
 					this.locationConstraint = grp.getLocationConstraint(subTaskIndex);
 				}
-
-				if (operatorState != null) {
-					execution.setOperatorState(operatorState);
-				}
-
 			}
 			else {
 				throw new IllegalStateException("Cannot reset a vertex that is in state " + state);
@@ -576,7 +561,7 @@ public class ExecutionVertex implements Serializable {
 	 * Returns all blocking result partitions whose receivers can be scheduled/updated.
 	 */
 	List<IntermediateResultPartition> finishAllBlockingPartitions() {
-		List<IntermediateResultPartition> finishedBlockingPartitions = new LinkedList<IntermediateResultPartition>();
+		List<IntermediateResultPartition> finishedBlockingPartitions = null;
 
 		for (IntermediateResultPartition partition : resultPartitions.values()) {
 			if (partition.getResultType().isBlocking() && partition.markFinished()) {

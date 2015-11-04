@@ -42,8 +42,4 @@ public class FromIteratorFunction<T> implements SourceFunction<T> {
 	public void cancel() {
 		isRunning = false;
 	}
-
-	protected TimestampedCollector<OUT> getCollector() {
-		return collector;
-	}
 }

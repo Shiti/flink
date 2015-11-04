@@ -193,7 +193,7 @@ public class Backtracking {
 				final IntermediateResultPartition resultRequired = taskRequirement.getNextRequirement();
 
 				if (resultRequired.isLocationAvailable()) {
-					ActorRef taskManager = resultRequired.getLocation().getTaskManager();
+					ActorRef taskManager = resultRequired.getLocation().getActorGateway().actor();
 
 					LOG.debug("Requesting availability of IntermediateResultPartition " + resultRequired.getPartitionId());
 					// pin ResulPartition for this intermediate result
@@ -226,7 +226,7 @@ public class Backtracking {
 							// continue with backtracking
 							scheduleUsingBacktracking();
 						}
-					}, AkkaUtils.globalExecutionContext());
+					}, task.getExecutionGraph().getExecutionContext());
 					/** END Asynchronous callback **/
 
 					// interrupt backtracking here and continue once future is complete

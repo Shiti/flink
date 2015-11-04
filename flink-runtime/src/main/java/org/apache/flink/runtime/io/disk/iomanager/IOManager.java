@@ -282,11 +282,7 @@ public abstract class IOManager {
 	 * 
 	 * @return The directories that the I/O manager spills to.
 	 */
-	public File[] getSpillingDirectories() {
-		return this.paths;
-	}
-	
-	
+
 	protected int getNextPathNum() {
 		final int next = this.nextPath;
 		final int newNext = next + 1;

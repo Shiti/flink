@@ -27,15 +27,17 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.akka.AkkaUtils;
+import org.apache.flink.runtime.blob.BlobKey;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.executiongraph.IntermediateResult;
 import org.apache.flink.runtime.executiongraph.IntermediateResultPartition;
+import org.apache.flink.runtime.instance.ActorGateway;
 import org.apache.flink.runtime.instance.Instance;
 import org.apache.flink.runtime.instance.InstanceConnectionInfo;
 import org.apache.flink.runtime.instance.InstanceDiedException;
-import org.apache.flink.runtime.jobgraph.AbstractJobVertex;
+import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.DistributionPattern;
 import org.apache.flink.runtime.jobgraph.InputFormatVertex;
 import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
@@ -50,7 +52,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import scala.Option;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -108,31 +112,31 @@ public class BacktrackingTest {
 	}
 
 	@Before
-	public void setup(){
+	public void setup() {
 		system = ActorSystem.create("TestingActorSystem", TestingUtils.testConfig());
-		TestingUtils.setCallingThreadDispatcher(system);
+//		TestingUtils.setCallingThreadDispatcher(system);
 	}
 
 	@After
-	public void teardown(){
-		TestingUtils.setGlobalExecutionContext();
+	public void teardown() {
+//		TestingUtils.setGlobalExecutionContext();
 		JavaTestKit.shutdownActorSystem(system);
 	}
 
-	private AbstractJobVertex createNode(String name) {
-		AbstractJobVertex abstractJobVertex = new AbstractJobVertex(name);
+	private JobVertex createNode(String name) {
+		JobVertex abstractJobVertex = new JobVertex(name);
 		abstractJobVertex.setInvokableClass(Tasks.NoOpInvokable.class);
 		return abstractJobVertex;
 	}
 
-	private AbstractJobVertex createOutputNode(String name) {
-		AbstractJobVertex abstractJobVertex = new OutputFormatVertex(name);
+	private JobVertex createOutputNode(String name) {
+		JobVertex abstractJobVertex = new OutputFormatVertex(name);
 		abstractJobVertex.setInvokableClass(Tasks.NoOpInvokable.class);
 		return abstractJobVertex;
 	}
 
-	private AbstractJobVertex createInputNode(String name) {
-		AbstractJobVertex abstractJobVertex = new InputFormatVertex(name);
+	private JobVertex createInputNode(String name) {
+		JobVertex abstractJobVertex = new InputFormatVertex(name);
 		abstractJobVertex.setInvokableClass(Tasks.NoOpInvokable.class);
 		return abstractJobVertex;
 	}
@@ -144,10 +148,10 @@ public class BacktrackingTest {
 		final Configuration cfg = new Configuration();
 
 		// JobVertex which has intermediate results available
-		final AbstractJobVertex resumePoint;
+		final JobVertex resumePoint;
 
         /*
-               sink1         sink2
+			   sink1         sink2
                  O             O
                  ^             ^
                 ´ `           ´ `
@@ -171,19 +175,19 @@ public class BacktrackingTest {
         */
 
 		// topologically sorted list
-		final List<AbstractJobVertex> list = new ArrayList<AbstractJobVertex>();
+		final List<JobVertex> list = new ArrayList<JobVertex>();
 
-		final AbstractJobVertex source = createInputNode("source1");
+		final JobVertex source = createInputNode("source1");
 		list.add(source);
 
-		AbstractJobVertex node1 = createOutputNode("sink1");
+		JobVertex node1 = createOutputNode("sink1");
 		{
-			AbstractJobVertex child1 = createNode("sink1-child1");
-			AbstractJobVertex child2 = createNode("sink1-child2");
+			JobVertex child1 = createNode("sink1-child1");
+			JobVertex child2 = createNode("sink1-child2");
 			node1.connectNewDataSetAsInput(child1, DistributionPattern.ALL_TO_ALL);
 			node1.connectNewDataSetAsInput(child2, DistributionPattern.ALL_TO_ALL);
 
-			AbstractJobVertex child1child2child = createNode("sink1-child1-child2-child");
+			JobVertex child1child2child = createNode("sink1-child1-child2-child");
 			child1.connectNewDataSetAsInput(child1child2child, DistributionPattern.ALL_TO_ALL);
 			child2.connectNewDataSetAsInput(child1child2child, DistributionPattern.ALL_TO_ALL);
 
@@ -194,14 +198,14 @@ public class BacktrackingTest {
 			list.add(child2);
 		}
 
-		AbstractJobVertex node2 = createOutputNode("sink2");
-		final AbstractJobVertex child1 = createNode("sink2-child1");
-		final AbstractJobVertex child2 = createNode("sink2-child2");
+		JobVertex node2 = createOutputNode("sink2");
+		final JobVertex child1 = createNode("sink2-child1");
+		final JobVertex child2 = createNode("sink2-child2");
 		node2.connectNewDataSetAsInput(child1, DistributionPattern.ALL_TO_ALL);
 		node2.connectNewDataSetAsInput(child2, DistributionPattern.ALL_TO_ALL);
 
 		// resume from this node
-		AbstractJobVertex child1child2child = createNode("sink1-child1-child2-child");
+		JobVertex child1child2child = createNode("sink1-child1-child2-child");
 		resumePoint = child1child2child;
 
 		child1.connectNewDataSetAsInput(child1child2child, DistributionPattern.ALL_TO_ALL);
@@ -216,13 +220,19 @@ public class BacktrackingTest {
 		list.add(node1);
 		list.add(node2);
 
-		final ExecutionGraph eg = new ExecutionGraph(jobId, jobName, cfg, AkkaUtils.getDefaultTimeout());
+		final ExecutionGraph eg = new ExecutionGraph(TestingUtils.defaultExecutionContext(),
+				jobId, jobName, cfg, AkkaUtils.getDefaultTimeout(),
+				new ArrayList<BlobKey>(),
+				new ArrayList<URL>(),
+				ExecutionGraph.class.getClassLoader());
 
 		new JavaTestKit(system) {
 			{
 
 				final Props props = Props.create(TestTaskManager.class, getRef());
 				final ActorRef taskManagerActor = system.actorOf(props);
+				Option<String> empty = Option.empty();
+				ActorGateway actorGateway = TestingUtils.createForwardingJobManager(system, taskManagerActor, empty);
 
 				eg.setScheduleMode(ScheduleMode.BACKTRACKING);
 
@@ -243,7 +253,7 @@ public class BacktrackingTest {
 								// mock an instance
 								Instance mockInstance = Mockito.mock(Instance.class);
 								Mockito.when(mockInstance.isAlive()).thenReturn(true);
-								Mockito.when(mockInstance.getTaskManager()).thenReturn(taskManagerActor);
+								Mockito.when(mockInstance.getActorGateway()).thenReturn(actorGateway);
 								InstanceConnectionInfo instanceConnectionInfo = new InstanceConnectionInfo();
 								Mockito.when(mockInstance.getInstanceConnectionInfo()).thenReturn(instanceConnectionInfo);
 								// set the mock as a location
@@ -262,11 +272,11 @@ public class BacktrackingTest {
 				schedulePoints.add(child2.getID());
 				schedulePoints.add(source.getID());
 
-				final Scheduler scheduler = new Scheduler();//Mockito.mock(Scheduler.class);
+				final Scheduler scheduler = new Scheduler(TestingUtils.defaultExecutionContext());//Mockito.mock(Scheduler.class);
 
 				Instance i1 = null;
 				try {
-					i1 = ExecutionGraphTestUtils.getInstance(taskManagerActor, 10);
+					i1 = ExecutionGraphTestUtils.getInstance(actorGateway, 10);
 				} catch (Exception e) {
 					e.printStackTrace();
 					fail("Couldn't get instance: " + e.getMessage());
@@ -318,10 +328,10 @@ public class BacktrackingTest {
 
 		//Random rand = new Random(System.currentTimeMillis());
 
-		LinkedList<AbstractJobVertex> allNodes = new LinkedList<AbstractJobVertex>();
+		LinkedList<JobVertex> allNodes = new LinkedList<JobVertex>();
 
 		for (int s = 0; s < numSinks; s++) {
-			AbstractJobVertex node = new OutputFormatVertex("sink" + s);
+			JobVertex node = new OutputFormatVertex("sink" + s);
 			node.setInvokableClass(Tasks.NoOpInvokable.class);
 
 			//node.setParallelism(rand.nextInt(maxParallelism) + 1);
@@ -329,7 +339,7 @@ public class BacktrackingTest {
 			allNodes.addLast(node);
 
 			for (int i = 0; i < depth; i++) {
-				AbstractJobVertex other = new AbstractJobVertex("vertex" + i + " sink" + s);
+				JobVertex other = new JobVertex("vertex" + i + " sink" + s);
 				other.setParallelism(parallelism);
 				other.setInvokableClass(Tasks.NoOpInvokable.class);
 				node.connectNewDataSetAsInput(other, DistributionPattern.ALL_TO_ALL);
@@ -339,7 +349,11 @@ public class BacktrackingTest {
 
 		}
 
-		final ExecutionGraph eg = new ExecutionGraph(jobId, jobName, cfg, AkkaUtils.getDefaultTimeout());
+		final ExecutionGraph eg = new ExecutionGraph(TestingUtils.defaultExecutionContext(),
+				jobId, jobName, cfg, AkkaUtils.getDefaultTimeout(),
+				new ArrayList<BlobKey>(),
+				new ArrayList<URL>(),
+				ExecutionGraph.class.getClassLoader());
 
 		eg.setScheduleMode(ScheduleMode.BACKTRACKING);
 
@@ -355,13 +369,14 @@ public class BacktrackingTest {
 
 				final Props props = Props.create(TestTaskManager.class, getRef());
 				final ActorRef taskManagerActor = system.actorOf(props);
+				Option<String> empty = Option.empty();
+				ActorGateway actorGateway = TestingUtils.createForwardingJobManager(system, taskManagerActor, empty);
 
-
-				Scheduler scheduler = new Scheduler();
+				Scheduler scheduler = new Scheduler(TestingUtils.defaultExecutionContext());
 
 				Instance i1 = null;
 				try {
-					i1 = ExecutionGraphTestUtils.getInstance(taskManagerActor, numSinks * parallelism);
+					i1 = ExecutionGraphTestUtils.getInstance(actorGateway, numSinks * parallelism);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -375,7 +390,7 @@ public class BacktrackingTest {
 					fail("Failed to schedule ExecutionGraph");
 				}
 
-				for (int i=0; i < numSinks * parallelism; i++) {
+				for (int i = 0; i < numSinks * parallelism; i++) {
 					// all sources should be scheduled
 					expectMsgClass(duration("1 second"), TaskMessages.SubmitTask.class);
 				}
