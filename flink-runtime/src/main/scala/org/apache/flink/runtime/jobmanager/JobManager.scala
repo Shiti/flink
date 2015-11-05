@@ -111,7 +111,7 @@ class JobManager(
     protected val leaderElectionService: LeaderElectionService,
     protected val submittedJobGraphs : SubmittedJobGraphStore,
     protected val checkpointRecoveryFactory : CheckpointRecoveryFactory)
-  extends FlinkActor 
+  extends FlinkActor
   with LeaderSessionMessageFilter // mixin oder is important, we want filtering after logging
   with LogMessages // mixin order is important, we want first logging
   with LeaderContender
@@ -404,7 +404,7 @@ class JobManager(
       log.info(s"Trying to cancel job with ID $jobID.")
 
       currentJobs.get(jobID) match {
-        case Some((executionGraph, _)) =>
+        case Some((executionGraph, _)) if executionGraph.getJobID == jobID =>
           // execute the cancellation asynchronously
           Future {
             executionGraph.cancel()
@@ -1086,7 +1086,7 @@ class JobManager(
 
   /**
    * Dedicated handler for monitor info request messages.
-   * 
+   *
    * Note that this handler does not fail. Errors while responding to info messages are logged,
    * but will not cause the actor to crash.
    *
@@ -1136,8 +1136,8 @@ class JobManager(
                 ourJobs, archiveOverview)
           }(context.dispatcher)
 
-        case msg : RequestJobDetails => 
-          
+        case msg : RequestJobDetails =>
+
           val ourDetails: Array[JobDetails] = if (msg.shouldIncludeRunning()) {
             currentJobs.values.map {
               v => WebMonitorUtils.createDetailsForJob(v._1)
@@ -1145,7 +1145,7 @@ class JobManager(
           } else {
             null
           }
-          
+
           if (msg.shouldIncludeFinished()) {
             val future = (archive ? msg)(timeout)
             future.onSuccess {
@@ -1155,7 +1155,7 @@ class JobManager(
           } else {
             theSender ! new MultipleJobsDetails(ourDetails, null)
           }
-          
+
         case _ => log.error("Unrecognized info message " + actorMessage)
       }
     }
@@ -1187,7 +1187,7 @@ class JobManager(
     val finished = new java.util.ArrayList[JobID]()
     val canceled = new java.util.ArrayList[JobID]()
     val failed = new java.util.ArrayList[JobID]()
-    
+
     currentJobs.values.foreach { case (graph, _) =>
       graph.getState() match {
         case JobStatus.FINISHED => finished.add(graph.getJobID)
@@ -1334,7 +1334,7 @@ class JobManager(
     // terminate JobManager in case of an error
     self ! decorateMessage(PoisonPill)
   }
-  
+
   /**
    * Updates the accumulators reported from a task manager via the Heartbeat message.
    * @param accumulators list of accumulator snapshots
@@ -1482,7 +1482,7 @@ object JobManager {
       listeningAddress: String,
       listeningPort: Int)
     : Unit = {
-    
+
     val (jobManagerSystem, _, _, _) = startActorSystemAndJobManagerActors(
       configuration,
       executionMode,
@@ -1734,7 +1734,7 @@ object JobManager {
       }
       else {
         LOG.info("Staring JobManager without high-availability")
-  
+
         configuration.getInteger(ConfigConstants.JOB_MANAGER_IPC_PORT_KEY,
             ConfigConstants.DEFAULT_JOB_MANAGER_IPC_PORT)
       }
@@ -1742,7 +1742,7 @@ object JobManager {
     val executionMode = config.getJobManagerMode
     val streamingMode = config.getStreamingMode
     val hostPortUrl = NetUtils.hostAndPortToUrlString(host, port)
-    
+
     LOG.info(s"Starting JobManager on $hostPortUrl with execution mode $executionMode and " +
       s"streaming mode $streamingMode")
 

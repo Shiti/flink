@@ -23,6 +23,8 @@ import java.util.UUID
 import akka.actor.ActorRef
 import org.apache.flink.runtime.accumulators.AccumulatorSnapshot
 import org.apache.flink.runtime.instance.InstanceID
+import org.apache.flink.runtime.io.network.partition.ResultPartitionID
+import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID
 
 /**
  * Miscellaneous actor messages exchanged with the TaskManager.

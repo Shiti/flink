@@ -20,7 +20,8 @@ package org.apache.flink.runtime.testingUtils
 
 import akka.actor.ActorRef
 import org.apache.flink.api.common.JobID
-import org.apache.flink.runtime.executiongraph.ExecutionAttemptID
+import org.apache.flink.runtime.executiongraph.{ExecutionJobVertex, ExecutionAttemptID}
+import org.apache.flink.runtime.jobgraph.{IntermediateDataSetID, IntermediateResultPartitionID}
 import org.apache.flink.runtime.taskmanager.Task
 
 /**
@@ -41,6 +42,8 @@ object TestingTaskManagerMessages {
 
   case object RequestNumActiveConnections
   case class ResponseNumActiveConnections(number: Int)
+
+  case class CheckIfJobRemoved(jobID: JobID)
   
   case object RequestRunningTasks
   
@@ -58,6 +61,15 @@ object TestingTaskManagerMessages {
    * of accumulator updates.
    */
   case class AccumulatorsChanged(jobID: JobID)
+
+
+  /** For ResumeITCase */
+  case class NotifyWhenTaskSubmitted(jobID: JobID)
+
+  case class NotifyWhenResultPartitionChanges(partitionID: IntermediateResultPartitionID)
+
+  case class ResultPartitionCached(partitionID: IntermediateResultPartitionID)
+  case class ResultPartitionLocked(partitionID: IntermediateResultPartitionID)
 
   // --------------------------------------------------------------------------
   // Utility methods to allow simpler case object access from Java

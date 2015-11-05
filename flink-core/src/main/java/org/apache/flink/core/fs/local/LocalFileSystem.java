@@ -66,6 +66,11 @@ public class LocalFileSystem extends FileSystem {
 
 	private static final Logger LOG = LoggerFactory.getLogger(LocalFileSystem.class);
 
+	private final String MMAP_LOCAL_READ_PROP = "org.flink.fs.mmap.enable";
+
+	private final String mmapReadPropValue = System.getProperty(MMAP_LOCAL_READ_PROP);
+	private final boolean mmapReadEnabled = mmapReadPropValue != null && mmapReadPropValue.equalsIgnoreCase("true");
+
 	/**
 	 * Constructs a new <code>LocalFileSystem</code> object.
 	 */
@@ -134,11 +139,19 @@ public class LocalFileSystem extends FileSystem {
 		return open(f);
 	}
 
-
 	@Override
 	public FSDataInputStream open(final Path f) throws IOException {
 		final File file = pathToFile(f);
-		return new LocalDataInputStream(file);
+		FSDataInputStream fsdis = null;
+
+		if(mmapReadEnabled) {
+			LOG.warn("Using memory mapped file");
+			fsdis = new LocalMappedDataInputStream(file);
+		} else {
+			LOG.info("Using non mapped file");
+			fsdis = new LocalDataInputStream(file);
+		}
+		return fsdis;
 	}
 
 

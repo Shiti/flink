@@ -69,7 +69,6 @@ public class SchedulerTestUtils {
 		return new Instance(DummyActorGateway.INSTANCE, ci, new InstanceID(), resources, numSlots);
 	}
 	
-	
 	public static Execution getDummyTask() {
 		ExecutionVertex vertex = mock(ExecutionVertex.class);
 		when(vertex.getJobId()).thenReturn(new JobID());

@@ -1176,9 +1176,9 @@ public abstract class ExecutionEnvironment {
 	 * Sets a context environment factory, that creates the context environment for running programs
 	 * with pre-configured environments. Examples are running programs from the command line, and
 	 * running programs in the Scala shell.
-	 * 
+	 *
 	 * <p>When the context environment factors is set, no other environments can be explicitly used.
-	 * 
+	 *
 	 * @param ctx The context environment factory.
 	 */
 	protected static void initializeContextEnvironment(ExecutionEnvironmentFactory ctx) {
@@ -1197,7 +1197,7 @@ public abstract class ExecutionEnvironment {
 	/**
 	 * Checks whether it is currently permitted to explicitly instantiate a LocalEnvironment
 	 * or a RemoteEnvironment.
-	 * 
+	 *
 	 * @return True, if it is possible to explicitly instantiate a LocalEnvironment or a
 	 *         RemoteEnvironment, false otherwise.
 	 */

@@ -260,6 +260,10 @@ public abstract class IOManager {
 			List<MemorySegment> targetSegments, int numBlocks) throws IOException;
 
 
+	public File[] getSpillingDirectories() {
+		return this.paths;
+	}
+	
 	// ------------------------------------------------------------------------
 	//                          Utilities
 	// ------------------------------------------------------------------------
@@ -278,15 +282,13 @@ public abstract class IOManager {
 	 * 
 	 * @return The directories that the I/O manager spills to.
 	 */
-	public File[] getSpillingDirectories() {
-		return this.paths;
-	}
-	
-	
+
 	protected int getNextPathNum() {
 		final int next = this.nextPath;
 		final int newNext = next + 1;
 		this.nextPath = newNext >= this.paths.length ? 0 : newNext;
 		return next;
 	}
+	
+	
 }

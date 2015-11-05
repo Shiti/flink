@@ -229,7 +229,7 @@ public class ExecutionVertex implements Serializable {
 	public InstanceConnectionInfo getCurrentAssignedResourceLocation() {
 		return currentExecution.getAssignedResourceLocation();
 	}
-	
+
 	public Execution getPriorExecutionAttempt(int attemptNumber) {
 		if (attemptNumber >= 0 && attemptNumber < priorExecutions.size()) {
 			return priorExecutions.get(attemptNumber);
@@ -238,7 +238,7 @@ public class ExecutionVertex implements Serializable {
 			throw new IllegalArgumentException("attempt does not exist");
 		}
 	}
-	
+
 	public ExecutionGraph getExecutionGraph() {
 		return this.jobVertex.getGraph();
 	}
@@ -610,7 +610,7 @@ public class ExecutionVertex implements Serializable {
 
 	/**
 	 * Creates a task deployment descriptor to deploy a subtask to the given target slot.
-	 * 
+	 *
 	 * TODO: This should actually be in the EXECUTION
 	 */
 	TaskDeploymentDescriptor createDeploymentDescriptor(
@@ -657,6 +657,20 @@ public class ExecutionVertex implements Serializable {
 	// --------------------------------------------------------------------------------------------
 	//  Utilities
 	// --------------------------------------------------------------------------------------------
+
+	/**
+	 * Gets all IntermediateResultPartitions required by this Execution Vertex
+	 * @return list of intermediate result partitions
+	 */
+	public List<IntermediateResultPartition> getInputs() {
+		List<IntermediateResultPartition> intermediateResultPartitions = new ArrayList<IntermediateResultPartition>();
+		for (ExecutionEdge[] edgeList : inputEdges) {
+			for (ExecutionEdge edge : edgeList) {
+				intermediateResultPartitions.add(edge.getSource());
+			}
+		}
+		return intermediateResultPartitions;
+	}
 
 	/**
 	 * Creates a simple name representation in the style 'taskname (x/y)', where

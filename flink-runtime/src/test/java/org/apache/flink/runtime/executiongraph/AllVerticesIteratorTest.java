@@ -45,7 +45,7 @@ public class AllVerticesIteratorTest {
 			
 			ExecutionGraph eg = Mockito.mock(ExecutionGraph.class);
 			Mockito.when(eg.getExecutionContext()).thenReturn(TestingUtils.directExecutionContext());
-					
+
 			ExecutionJobVertex ejv1 = new ExecutionJobVertex(eg, v1, 1,
 					AkkaUtils.getDefaultTimeout());
 			ExecutionJobVertex ejv2 = new ExecutionJobVertex(eg, v2, 1,
