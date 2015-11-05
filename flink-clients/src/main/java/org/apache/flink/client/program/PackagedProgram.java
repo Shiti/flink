@@ -694,7 +694,12 @@ public class PackagedProgram {
 		private Plan plan;
 		
 		private String preview = null;
-		
+
+		@Override
+		public void startNewSession() throws Exception {
+
+		}
+
 		@Override
 		public JobExecutionResult execute(String jobName) throws Exception {
 			this.plan = createProgramPlan(jobName);
