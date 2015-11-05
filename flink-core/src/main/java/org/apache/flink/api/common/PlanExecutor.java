@@ -51,7 +51,46 @@ public abstract class PlanExecutor {
 	public boolean isPrintingStatusDuringExecution() {
 		return this.printUpdatesToSysout;
 	}
-	
+
+
+	/** Job identifer, may only be set for explicit resume of a job.  */
+	private JobID jobID = null;
+
+	private long sessionTimeout = 0;
+
+	/**
+	 * Sets the job identifier for execution of jobs. May be set to null to disable session management.
+	 * @param jobID
+	 */
+	public void setJobID(JobID jobID) {
+		this.jobID = jobID;
+	}
+
+	/**
+	 * Gets the job identifier of this executor.
+	 * @return
+	 */
+	public JobID getJobID() {
+		return jobID;
+	}
+
+	/**
+	 * Gets the session timeout.
+	 * @return The session timeout in seconds.
+	 */
+	public long getSessionTimeout() {
+		return sessionTimeout;
+	}
+
+	/**
+	 * Sets the session timeout.
+	 * @return The session timeout in seconds.
+	 */
+	public void setSessionTimeout(long sessionTimeout) {
+		this.sessionTimeout = sessionTimeout;
+	}
+
+
 	// ------------------------------------------------------------------------
 	//  Program Execution
 	// ------------------------------------------------------------------------
