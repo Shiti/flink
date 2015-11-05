@@ -153,9 +153,9 @@ public class RemoteEnvironment extends ExecutionEnvironment {
 
 		Plan p = createProgramPlan(jobName);
 
-		// Session management is disabled, revert this commit to enable
-		//p.setJobId(jobID);
-		//p.setSessionTimeout(sessionTimeout);
+		// Enabling Session management
+		p.setJobId(jobID);
+		p.setSessionTimeout(sessionTimeout);
 
 		JobExecutionResult result = executor.executePlan(p);
 
