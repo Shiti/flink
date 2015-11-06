@@ -85,9 +85,7 @@ public class RemoteExecutor extends PlanExecutor {
 	public JobExecutionResult executePlanWithJars(JobWithJars p) throws Exception {
 		Client c = new Client(this.address, new Configuration(), p.getUserCodeClassLoader(), -1);
 		c.setPrintStatusDuringExecution(isPrintingStatusDuringExecution());
-
-		c.setJobID(getJobID());
-		c.setSessionTimeout(getSessionTimeout());
+		
 		JobSubmissionResult result = c.run(p, -1, true);
 		if (result instanceof JobExecutionResult) {
 			return (JobExecutionResult) result;
@@ -103,10 +101,7 @@ public class RemoteExecutor extends PlanExecutor {
 		
 		Client c = new Client(this.address, new Configuration(), program.getUserCodeClassLoader(), -1);
 		c.setPrintStatusDuringExecution(isPrintingStatusDuringExecution());
-
-		c.setJobID(getJobID());
-		c.setSessionTimeout(getSessionTimeout());
-
+		
 		JobSubmissionResult result = c.run(program.getPlanWithJars(), -1, true);
 		if(result instanceof JobExecutionResult) {
 			return (JobExecutionResult) result;

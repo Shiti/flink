@@ -25,12 +25,12 @@ import java.util.Calendar;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.Plan;
-import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.cache.DistributedCache.DistributedCacheEntry;
 import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.common.io.InputFormat;
@@ -106,10 +106,8 @@ public abstract class ExecutionEnvironment {
 	
 	// --------------------------------------------------------------------------------------------
 	
-	protected JobID jobID;
-
-	protected long sessionTimeout = 0;
-
+	private final UUID executionId;
+	
 	private final List<DataSink<?>> sinks = new ArrayList<DataSink<?>>();
 	
 	private final List<Tuple2<String, DistributedCacheEntry>> cacheFile = new ArrayList<Tuple2<String, DistributedCacheEntry>>();
@@ -130,7 +128,7 @@ public abstract class ExecutionEnvironment {
 	 * Creates a new Execution Environment.
 	 */
 	protected ExecutionEnvironment() {
-		this.jobID = JobID.generate();
+		this.executionId = UUID.randomUUID();
 	}
 
 	/**
@@ -235,8 +233,8 @@ public abstract class ExecutionEnvironment {
 	 * @return The UUID of this environment.
 	 * @see #getIdString()
 	 */
-	public JobID getId() {
-		return this.jobID;
+	public UUID getId() {
+		return this.executionId;
 	}
 
 	/**
@@ -256,25 +254,7 @@ public abstract class ExecutionEnvironment {
 	 * @see #getId()
 	 */
 	public String getIdString() {
-		return this.jobID.toString();
-	}
-
-
-	/**
-	 * Starts a new job and thereby a new session, discarding all intermediate results.
-	 */
-	public abstract void startNewSession() throws Exception;
-
-	/**
-	 * Sets the session timeout to hold the intermediate results of a job. This only
-	 * applies the updated timeout in future executions.
-	 * @param timeout The timeout in seconds.
-	 */
-	public void setSessionTimeout(long timeout) {
-		if (timeout < 0) {
-			throw new IllegalArgumentException("The session timeout must not be less than zero.");
-		}
-		sessionTimeout = timeout;
+		return this.executionId.toString();
 	}
 
 	// --------------------------------------------------------------------------------------------
