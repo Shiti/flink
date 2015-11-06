@@ -101,12 +101,8 @@ public class LocalExecutor extends PlanExecutor {
 
 	public void start() throws Exception {
 		synchronized (this.lock) {
-			final boolean shutDownAtEnd;
-
 			if (this.flink == null) {
-				// we start a session just for us now
-				shutDownAtEnd = getSessionTimeout() == 0;
-
+				
 				// create the embedded runtime
 				Configuration configuration = createConfiguration(this);
 				if(this.configuration != null) {
@@ -115,7 +111,7 @@ public class LocalExecutor extends PlanExecutor {
 				// start it up
 				this.flink = new LocalFlinkMiniCluster(configuration, true);
 			} else {
-				shutDownAtEnd = false;
+				throw new IllegalStateException("The local executor was already started.");
 			}
 		}
 	}
@@ -178,12 +174,7 @@ public class LocalExecutor extends PlanExecutor {
 				
 				JobGraphGenerator jgg = new JobGraphGenerator();
 				JobGraph jobGraph = jgg.compileJobGraph(op);
-
-				if (getJobID() != null) {
-					jobGraph.setJobID(getJobID());
-					jobGraph.setSessionTimeout(getSessionTimeout());
-				}
-
+				
 				boolean sysoutPrint = isPrintingStatusDuringExecution();
 				SerializedJobExecutionResult result = flink.submitJobAndWait(jobGraph,sysoutPrint);
 				return result.toJobExecutionResult(ClassLoader.getSystemClassLoader());

@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.google.common.base.Preconditions;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
@@ -73,19 +72,14 @@ public class JobGraph implements Serializable {
 	private final List<BlobKey> userJarBlobKeys = new ArrayList<BlobKey>();
 	
 	/** ID of this job. */
-	private JobID jobID;
+	private final JobID jobID;
 
 	/** Name of this job. */
 	private String jobName;
 	
 	/** The number of times that failed tasks should be re-executed */
 	private int numExecutionRetries;
-
-	/** The number of seconds after which the corresponding ExecutionGraph is removed at the
-	 * job manager after it has been executed.
-	 */
-	private long sessionTimeout = 0;
-
+	
 	/** flag to enable queued scheduling */
 	private boolean allowQueuedScheduling;
 
@@ -95,7 +89,7 @@ public class JobGraph implements Serializable {
 	/** The settings for asynchronous snapshotting */
 	private JobSnapshottingSettings snapshotSettings;
 	
-
+	
 	// --------------------------------------------------------------------------------------------
 	
 	/**
@@ -160,19 +154,7 @@ public class JobGraph implements Serializable {
 	}
 
 	// --------------------------------------------------------------------------------------------
-
-
-	/**
-	 * May be set if specific job id is desired (e.g. session management).
-	 *
-	 * @param jobID
-	 */
-	public void setJobID(JobID jobID) {
-		Preconditions.checkNotNull(jobID);
-		this.jobID = jobID;
-	}
-
-
+	
 	/**
 	 * Returns the ID of the job.
 	 * 
@@ -224,26 +206,7 @@ public class JobGraph implements Serializable {
 	public int getNumberOfExecutionRetries() {
 		return numExecutionRetries;
 	}
-
-
-	/**
-	 * Gets the timeout after which the corresponding ExecutionGraph is removed at the
-	 * job manager after it has been executed.
-	 * @return a timeout as a long in seconds.
-	 */
-	public long getSessionTimeout() {
-		return sessionTimeout;
-	}
-
-	/**
-	 * Sets the timeout of the session in seconds. The timeout specifies how long a job will be kept
-	 * in the job manager after it finishes.
-	 * @param sessionTimeout The timeout in seconds
-	 */
-	public void setSessionTimeout(long sessionTimeout) {
-		this.sessionTimeout = sessionTimeout;
-	}
-
+	
 	public void setAllowQueuedScheduling(boolean allowQueuedScheduling) {
 		this.allowQueuedScheduling = allowQueuedScheduling;
 	}

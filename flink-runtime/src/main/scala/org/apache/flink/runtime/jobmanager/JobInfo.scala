@@ -29,17 +29,8 @@ import akka.actor.ActorRef
  * @param client Actor which submitted the job
  * @param start Starting time
  */
-class JobInfo(val client: ActorRef, val start: Long, val sessionTimeout: Long){
+class JobInfo(val client: ActorRef, val start: Long){
   var end: Long = -1
-
-  var sessionAlive = true
-
-  var lastActive = 0L
-
-  setLastActive()
-
-  def setLastActive() =
-    lastActive = System.currentTimeMillis()
 
   def duration: Long = {
     if(end != -1){
@@ -51,5 +42,5 @@ class JobInfo(val client: ActorRef, val start: Long, val sessionTimeout: Long){
 }
 
 object JobInfo{
-  def apply(client: ActorRef, start: Long, sessionTimeout: Long) = new JobInfo(client, start, sessionTimeout)
+  def apply(client: ActorRef, start: Long) = new JobInfo(client, start)
 }
